@@ -37,7 +37,7 @@ class ProjectTypeDetector {
     def getDockerfile() {
         def projectType = detectProjectType()
         def dockerfileTemplate = "Dockerfile-${projectType}"
-        return this.script.libraryResource "dockerfileTemplates/${dockerfileTemplate}"
+        return this.script.libraryResource("dockerfileTemplates/${dockerfileTemplate}")
     }
 }
 

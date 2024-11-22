@@ -1,0 +1,42 @@
+---
+- name: Deploy to Kubernetes
+  hosts: kube_servers
+  become: yes
+  vars:
+    app_name: "{{ APP_NAME }}"
+    docker_image: "{{ IMAGE }}"
+    k8s_namespace: "{{ NAMESPACE }}"
+    file_path: "{{ FILE_Path }}"
+
+  tasks:
+    - name: Ensure namespace exists
+      kubernetes:
+        api_version: v1
+        kind: Namespace
+        name: "{{ k8s_namespace }}"
+        state: present
+
+    - name: Copy deployment script to Kubernetes server
+      copy:
+        src: ../scripts/deploy-k8s.sh
+        dest: /tmp/deploy-k8s.sh
+        mode: '0755'
+
+    - name: Execute deployment script
+      command: >
+        /tmp/deploy-k8s.sh
+        "{{ app_name }}"
+        "{{ docker_image }}"
+        "{{ k8s_namespace }}"
+        "{{ file_path }}"
+      register: deploy_result
+
+    - name: Display deployment result
+      debug:
+        var: deploy_result.stdout_lines
+
+    - name: Clean up deployment script
+      file:
+        path: /tmp/deploy-k8s.sh
+        state: absent
+

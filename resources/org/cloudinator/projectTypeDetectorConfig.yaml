@@ -1,0 +1,15 @@
+flutter:
+  files:
+    - "pubspec.yaml"
+nextjs:
+  files:
+    - "next.config.js"
+    - "package.json"
+react:
+  files:
+    - "package.json"
+    - "src/index.js"
+spring_boot:
+  files:
+    - "pom.xml"
+    - "build.gradle"

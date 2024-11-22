@@ -1,22 +1,16 @@
-def call(String projectPath) {
-    def projectType = org.cloudinator.ProjectTypeDetector.detectProjectType(projectPath)
+import org.cloudinator.ProjectTypeDetector
 
-    if (projectType) {
-        echo "Detected project type: ${projectType}"
-
-        if (!dockerfileExists(projectPath)) {
-            def packageManager = org.cloudinator.ProjectTypeDetector.detectPackageManager(projectPath)
-            org.cloudinator.ProjectTypeDetector.writeDockerfile(projectType, projectPath, packageManager)
-        } else {
-            echo "Dockerfile already exists at ${projectPath}/Dockerfile, skipping generation."
-        }
-
-        return projectType
-    } else {
-        error "Unable to detect the project type for ${projectPath}."
-    }
+def call(Map config = [:]) {
+    def projectRoot = config.projectRoot ?: '.'
+    
+    def detector = new ProjectTypeDetector(this, projectRoot)
+    def projectType = detector.detectProjectType()
+    
+    echo "Detected project type: ${projectType}"
+    
+    return [
+        type: projectType,
+        dockerfile: detector.getDockerfile()
+    ]
 }
 
-def dockerfileExists(String projectPath) {
-    return fileExists("${projectPath}/Dockerfile")
-}

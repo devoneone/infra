@@ -1,46 +1,43 @@
 package org.cloudinator
 
+import groovy.yaml.YamlSlurper
+
 class ProjectTypeDetector {
+    def script
+    def projectRoot
+    def config
 
-    static String detectProjectType(String projectPath) {
-        if (fileExists("${projectPath}/package.json")) {
-            def packageJson = readJSON file: "${projectPath}/package.json"
-            if (packageJson.dependencies?.'next') {
-                return 'nextjs'
-            } else if (packageJson.dependencies?.'react') {
-                return 'react'
+    ProjectTypeDetector(script, projectRoot) {
+        this.script = script
+        this.projectRoot = projectRoot
+        this.config = loadConfig()
+    }
+
+    private def loadConfig() {
+        def configFile = this.script.libraryResource 'org/cloudinator/projectTypeDetectorConfig.yaml'
+        return new YamlSlurper().parseText(configFile)
+    }
+
+    def detectProjectType() {
+        for (def projectType in config.projectTypes) {
+            if (checkForFiles(projectType.files)) {
+                return projectType.name
             }
-        } else if (fileExists("${projectPath}/pom.xml")) {
-            return 'springboot-maven'
-        } else if (fileExists("${projectPath}/build.gradle")) {
-            return 'springboot-gradle'
-        } else if (fileExists("${projectPath}/pubspec.yaml")) {
-            return 'flutter'
         }
-        return null
+        return "unknown"
     }
 
-    static String detectPackageManager(String projectPath) {
-        if (fileExists("${projectPath}/package-lock.json")) {
-            return 'npm'
-        } else if (fileExists("${projectPath}/yarn.lock")) {
-            return 'yarn'
-        } else if (fileExists("${projectPath}/pnpm-lock.yaml")) {
-            return 'pnpm'
-        } else if (fileExists("${projectPath}/bun.lockb")) {
-            return 'bun'
+    private boolean checkForFiles(files) {
+        return files.every { file ->
+            def path = "${projectRoot}/${file}"
+            script.fileExists(path)
         }
-        return 'npm'
     }
 
-    static void writeDockerfile(String projectType, String projectPath, String packageManager) {
-        try {
-            def dockerfileContent = libraryResource "dockerfileTemplates/Dockerfile-${projectType}"
-            dockerfileContent = dockerfileContent.replaceAll("\\{\\{packageManager\\}\\}", packageManager)
-            writeFile file: "${projectPath}/Dockerfile", text: dockerfileContent
-            echo "Dockerfile successfully written for ${projectType} project at ${projectPath}/Dockerfile"
-        } catch (Exception e) {
-            error "Failed to write Dockerfile for ${projectType} project: ${e.message}"
-        }
+    def getDockerfile() {
+        def projectType = detectProjectType()
+        def dockerfileTemplate = "Dockerfile-${projectType}"
+        return this.script.libraryResource "dockerfileTemplates/${dockerfileTemplate}"
     }
 }
+

@@ -1,15 +1,15 @@
-flutter:
-  files:
-    - "pubspec.yaml"
+# Example configuration for project type detection
 nextjs:
-  files:
-    - "next.config.js"
-    - "package.json"
+  dockerfile_template: "Dockerfile-nextjs"
+
 react:
-  files:
-    - "package.json"
-    - "src/index.js"
-spring_boot:
-  files:
-    - "pom.xml"
-    - "build.gradle"
+  dockerfile_template: "Dockerfile-react"
+
+springboot-maven:
+  dockerfile_template: "Dockerfile-springboot-maven"
+
+springboot-gradle:
+  dockerfile_template: "Dockerfile-springboot-gradle"
+
+flutter:
+  dockerfile_template: "Dockerfile-flutter"

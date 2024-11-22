@@ -1,0 +1,29 @@
+# Use an official Node.js runtime as a parent image
+FROM node:18-alpine AS builder
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Copy the package.json and package-lock.json files to the container
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN {{packageManager}} install
+
+# Copy all other project files to working directory
+COPY . .
+
+# Run the React build process and generate the artifacts
+RUN {{packageManager}} run build
+
+# Multi-stage build process
+FROM nginx:alpine
+
+# Copy the build artifacts from the builder stage
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx server
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,27 +1,46 @@
 package org.cloudinator
 
-import groovy.yaml.YamlSlurper
-import groovy.transform.CompileStatic
-
-@CompileStatic
 class ProjectTypeDetector {
 
-    // Load the project type configuration from a YAML file
-    static Map<String, List<String>> loadConfig(String configFile) {
-        def config = new YamlSlurper().parse(new File(configFile))
-        return config.collectEntries { key, value -> 
-            [key.capitalize(), value.files]
+    static String detectProjectType(String projectPath) {
+        if (fileExists("${projectPath}/package.json")) {
+            def packageJson = readJSON file: "${projectPath}/package.json"
+            if (packageJson.dependencies?.'next') {
+                return 'nextjs'
+            } else if (packageJson.dependencies?.'react') {
+                return 'react'
+            }
+        } else if (fileExists("${projectPath}/pom.xml")) {
+            return 'springboot-maven'
+        } else if (fileExists("${projectPath}/build.gradle")) {
+            return 'springboot-gradle'
+        } else if (fileExists("${projectPath}/pubspec.yaml")) {
+            return 'flutter'
         }
+        return null
     }
 
-    // Detect the project type based on configuration and existing files in the project directory
-    static String detect(String projectDir, String configFile = 'resources/org/cloudinator/projectTypeDetectorConfig.yaml') {
-        Map<String, List<String>> config = loadConfig(configFile)
-        config.each { projectType, files ->
-            if (files.every { new File(projectDir, it).exists() }) {
-                return projectType
-            }
+    static String detectPackageManager(String projectPath) {
+        if (fileExists("${projectPath}/package-lock.json")) {
+            return 'npm'
+        } else if (fileExists("${projectPath}/yarn.lock")) {
+            return 'yarn'
+        } else if (fileExists("${projectPath}/pnpm-lock.yaml")) {
+            return 'pnpm'
+        } else if (fileExists("${projectPath}/bun.lockb")) {
+            return 'bun'
         }
-        return "Unknown" // If no known files are found, return Unknown
+        return 'npm'
+    }
+
+    static void writeDockerfile(String projectType, String projectPath, String packageManager) {
+        try {
+            def dockerfileContent = libraryResource "dockerfileTemplates/Dockerfile-${projectType}"
+            dockerfileContent = dockerfileContent.replaceAll("\\{\\{packageManager\\}\\}", packageManager)
+            writeFile file: "${projectPath}/Dockerfile", text: dockerfileContent
+            echo "Dockerfile successfully written for ${projectType} project at ${projectPath}/Dockerfile"
+        } catch (Exception e) {
+            error "Failed to write Dockerfile for ${projectType} project: ${e.message}"
+        }
     }
 }

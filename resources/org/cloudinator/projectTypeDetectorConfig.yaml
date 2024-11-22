@@ -1,15 +1,22 @@
-# Example configuration for project type detection
-nextjs:
-  dockerfile_template: "Dockerfile-nextjs"
+projectTypes:
+  - name: flutter
+    files:
+      - pubspec.yaml
+      - lib/main.dart
+  - name: nextjs
+    files:
+      - package.json
+      - next.config.js
+  - name: react
+    files:
+      - package.json
+      - src/index.js
+  - name: springboot-gradle
+    files:
+      - build.gradle
+      - src/main/java
+  - name: springboot-maven
+    files:
+      - pom.xml
+      - src/main/java
 
-react:
-  dockerfile_template: "Dockerfile-react"
-
-springboot-maven:
-  dockerfile_template: "Dockerfile-springboot-maven"
-
-springboot-gradle:
-  dockerfile_template: "Dockerfile-springboot-gradle"
-
-flutter:
-  dockerfile_template: "Dockerfile-flutter"

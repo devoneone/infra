@@ -1,18 +1,26 @@
 #!/usr/bin/env groovy
 
 def call(String projectPath = '.') {
+    echo "Detecting project type for path: ${projectPath}"
     def projectInfo = detectProjectType(projectPath)
+
+    echo "Project info detected: ${projectInfo}"
+    echo "Project info type: ${projectInfo?.type}"
+    echo "Project info port: ${projectInfo?.port}"
 
     if (projectInfo) {
         echo "Detected project type: ${projectInfo.type}"
+        echo "Detected port: ${projectInfo.port}"
 
         if (!dockerfileExists(projectPath)) {
             def packageManager = detectPackageManager(projectPath)
+            echo "Detected package manager: ${packageManager}"
             writeDockerfile(projectInfo.type, projectPath, packageManager)
         } else {
             echo "Dockerfile already exists at ${projectPath}/Dockerfile, skipping generation."
         }
 
+        echo "Returning project info: ${projectInfo}"
         return projectInfo
     } else {
         error "Unable to detect the project type for ${projectPath}."
@@ -24,27 +32,30 @@ def dockerfileExists(String projectPath) {
 }
 
 def detectProjectType(String projectPath) {
+    echo "Checking for package.json in ${projectPath}"
     if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"
-        echo "Checking package.json for dependencies: ${packageJson.dependencies}"
+        echo "package.json contents: ${packageJson}"
 
-        // Check if the project is a Next.js project
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
             echo "Next.js project detected, setting port to 3000"
             return [type: 'nextjs', port: 3000]
-        } 
-        // Check if the project is a React project
-        else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
+        } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
+            echo "React project detected, setting port to 3000"
             return [type: 'react', port: 3000]
         }
     } else if (fileExists("${projectPath}/pom.xml")) {
+        echo "Spring Boot (Maven) project detected, setting port to 8080"
         return [type: 'springboot-maven', port: 8080]
     } else if (fileExists("${projectPath}/build.gradle") || fileExists("${projectPath}/build.gradle.kts")) {
+        echo "Spring Boot (Gradle) project detected, setting port to 8080"
         return [type: 'springboot-gradle', port: 8080]
     } else if (fileExists("${projectPath}/pubspec.yaml")) {
+        echo "Flutter project detected, setting port to 8080"
         return [type: 'flutter', port: 8080]
     }
 
+    echo "No recognized project type detected in ${projectPath}"
     return null
 }
 
@@ -94,3 +105,4 @@ def pushDockerImage(String dockerImageName, String dockerImageTag, String creden
         sh "docker logout"
     }
 }
+

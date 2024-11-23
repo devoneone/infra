@@ -6,6 +6,7 @@
     trivy_version: "0.45.1"  # Update this to the latest version as needed
     docker_image: "{{ IMAGE }}"
     trivy_severity: "HIGH,CRITICAL"
+    trivy_results_file: "/tmp/trivy-results.json"
 
   tasks:
     - name: Download Trivy
@@ -28,14 +29,25 @@
       command: >
         trivy image --severity {{ trivy_severity }} 
         --format json 
-        --output /tmp/trivy-results.json 
+        --output {{ trivy_results_file }}
         {{ docker_image }}
       register: trivy_scan
       ignore_errors: yes
 
+    - name: Check if Trivy results file exists
+      stat:
+        path: "{{ trivy_results_file }}"
+      register: trivy_results_stat
+
     - name: Display Trivy scan results
       debug:
-        msg: "{{ lookup('file', '/tmp/trivy-results.json') | from_json }}"
+        msg: "{{ lookup('file', trivy_results_file) | from_json }}"
+      when: trivy_results_stat.stat.exists
+
+    - name: Display error if Trivy results file doesn't exist
+      debug:
+        msg: "Trivy results file not found. Trivy scan may have failed."
+      when: not trivy_results_stat.stat.exists
 
     - name: Check for vulnerabilities
       fail:

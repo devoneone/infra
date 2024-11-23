@@ -1,5 +1,5 @@
 import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
+import groovy.json.JsonSlurperClassic
 
 def call(String repoUrl, String webhookUrl, String githubToken) {
     if (!githubToken) {
@@ -17,8 +17,6 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     echo "Creating webhook for ${repo} repository..."
     echo "API URL: ${apiUrl}"
     echo "Webhook URL: ${webhookUrl}"
-    echo "GitHub Token: ${githubToken}"
-    echo "Webhook Secret: ${WEBHOOK_SECRET}"
     echo "Owner: ${owner}"
     echo "Repo: ${repo}"
 
@@ -30,7 +28,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         returnStdout: true
     )
 
-    def existingWebhooks = new JsonSlurper().parseText(existingWebhooksResponse)
+    def existingWebhooks = new JsonSlurperClassic().parseText(existingWebhooksResponse)
     def webhookExists = existingWebhooks.find { it.config.url == webhookUrl }
 
     if (webhookExists) {
@@ -63,7 +61,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     )
 
     // Check if the webhook was created successfully
-    def jsonResponse = new JsonSlurper().parseText(response)
+    def jsonResponse = new JsonSlurperClassic().parseText(response)
     if (jsonResponse.id) {
         echo "Webhook created successfully: ${jsonResponse.url}"
     } else {

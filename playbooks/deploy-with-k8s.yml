@@ -1,9 +1,7 @@
 ---
-- name: Create Repo with Group in Git Cloudinator
+- name: Deploy application with HTTPS to Kubernetes
   hosts: kube_servers
   become: yes
-  # vars_files:
-  #   - ../vars/app_vars.yml
   tasks:
     - name: Copy shell script to Kubernetes server
       copy:
@@ -12,4 +10,13 @@
         mode: '0755'
 
     - name: Execute the shell script with dynamic variables
-      command: "bash /root/cloudinator/deploy-k8s.sh {{ APP_NAME }}  {{IMAGE}} {{ NAMESPACE }} {{ FILE_Path }} {{ DOMAIN_NAME }}"
+      command: >
+        bash /root/cloudinator/deploy-k8s.sh 
+        {{ APP_NAME }} 
+        {{ IMAGE }} 
+        {{ NAMESPACE }} 
+        {{ FILE_Path }} 
+        {{ DOMAIN_NAME }} 
+        {{ EMAIL }}
+        {{ PORT }}
+

@@ -70,3 +70,4 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         error "Failed to create webhook: ${jsonResponse.message}"
     }
 }
+

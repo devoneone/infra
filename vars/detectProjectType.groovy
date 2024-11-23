@@ -1,19 +1,19 @@
 #!/usr/bin/env groovy
 
 def call(String projectPath = '.') {
-    def projectType = detectProjectType(projectPath)
+    def projectInfo = detectProjectType(projectPath)
 
-    if (projectType) {
-        echo "Detected project type: ${projectType}"
+    if (projectInfo) {
+        echo "Detected project type: ${projectInfo.type}"
 
         if (!dockerfileExists(projectPath)) {
             def packageManager = detectPackageManager(projectPath)
-            writeDockerfile(projectType, projectPath, packageManager)
+            writeDockerfile(projectInfo.type, projectPath, packageManager)
         } else {
             echo "Dockerfile already exists at ${projectPath}/Dockerfile, skipping generation."
         }
 
-        return projectType
+        return projectInfo
     } else {
         error "Unable to detect the project type for ${projectPath}."
     }
@@ -27,16 +27,16 @@ def detectProjectType(String projectPath) {
     if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
-            return 'nextjs'
+            return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
-            return 'react'
+            return [type: 'react', port: 3000]
         }
     } else if (fileExists("${projectPath}/pom.xml")) {
-        return 'springboot-maven'
+        return [type: 'springboot-maven', port: 8080]
     } else if (fileExists("${projectPath}/build.gradle") || fileExists("${projectPath}/build.gradle.kts")) {
-        return 'springboot-gradle'
+        return [type: 'springboot-gradle', port: 8080]
     } else if (fileExists("${projectPath}/pubspec.yaml")) {
-        return 'flutter'
+        return [type: 'flutter', port: 8080]
     }
 
     return null
@@ -88,3 +88,4 @@ def pushDockerImage(String dockerImageName, String dockerImageTag, String creden
         sh "docker logout"
     }
 }
+

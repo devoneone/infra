@@ -8,8 +8,8 @@
     - name: Copy shell script to Kubernetes server
       copy:
         src: ../scripts/deploy-k8s.sh
-        dest: /root/istad/deploy-k8s.sh
+        dest: /root/cloudinator/deploy-k8s.sh
         mode: '0755'
 
     - name: Execute the shell script with dynamic variables
-      command: "bash /root/istad/deploy-k8s.sh {{ APP_NAME }}  {{IMAGE}} {{ NAMESPACE }} {{ FILE_Path }}"
+      command: "bash /root/cloudinator/deploy-k8s.sh {{ APP_NAME }}  {{IMAGE}} {{ NAMESPACE }} {{ FILE_Path }}"

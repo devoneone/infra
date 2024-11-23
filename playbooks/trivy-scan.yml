@@ -1,0 +1,44 @@
+---
+- name: Install Trivy and Scan Docker Image
+  hosts: kube_servers
+  become: yes
+  vars:
+    trivy_version: "0.45.1"  # Update this to the latest version as needed
+    docker_image: "{{ IMAGE }}"
+    trivy_severity: "HIGH,CRITICAL"
+
+  tasks:
+    - name: Download Trivy
+      get_url:
+        url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.tar.gz"
+        dest: "/tmp/trivy.tar.gz"
+
+    - name: Extract Trivy
+      unarchive:
+        src: "/tmp/trivy.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: yes
+
+    - name: Make Trivy executable
+      file:
+        path: "/usr/local/bin/trivy"
+        mode: '0755'
+
+    - name: Run Trivy scan
+      command: >
+        trivy image --severity {{ trivy_severity }} 
+        --format json 
+        --output /tmp/trivy-results.json 
+        {{ docker_image }}
+      register: trivy_scan
+      ignore_errors: yes
+
+    - name: Display Trivy scan results
+      debug:
+        msg: "{{ lookup('file', '/tmp/trivy-results.json') | from_json }}"
+
+    - name: Check for vulnerabilities
+      fail:
+        msg: "Trivy found vulnerabilities in the image"
+      when: trivy_scan.rc != 0
+

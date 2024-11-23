@@ -26,9 +26,15 @@ def dockerfileExists(String projectPath) {
 def detectProjectType(String projectPath) {
     if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"
+        echo "Checking package.json for dependencies: ${packageJson.dependencies}"
+
+        // Check if the project is a Next.js project
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
+            echo "Next.js project detected, setting port to 3000"
             return [type: 'nextjs', port: 3000]
-        } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
+        } 
+        // Check if the project is a React project
+        else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
             return [type: 'react', port: 3000]
         }
     } else if (fileExists("${projectPath}/pom.xml")) {
@@ -88,4 +94,3 @@ def pushDockerImage(String dockerImageName, String dockerImageTag, String creden
         sh "docker logout"
     }
 }
-

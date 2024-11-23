@@ -1,9 +1,7 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import hudson.util.Secret
 
 def call(String repoUrl, String webhookUrl, String githubToken) {
-
     if (!githubToken) {
         echo "GitHub token is null, skipping webhook creation."
         return
@@ -25,14 +23,14 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     echo "Repo: ${repo}"
 
     // Fetch existing webhooks
-    def existingWebhooksResponse = httpRequest(
-        url: apiUrl,
-        httpMode: 'GET',
-        customHeaders: [[name: 'Authorization', value: "Bearer ${githubToken}"]],
-        contentType: 'APPLICATION_JSON'
+    def existingWebhooksResponse = sh(
+        script: """
+            curl -s -H "Authorization: Bearer ${githubToken}" "${apiUrl}"
+        """,
+        returnStdout: true
     )
 
-    def existingWebhooks = new JsonSlurper().parseText(existingWebhooksResponse.content)
+    def existingWebhooks = new JsonSlurper().parseText(existingWebhooksResponse)
     def webhookExists = existingWebhooks.find { it.config.url == webhookUrl }
 
     if (webhookExists) {
@@ -42,10 +40,10 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
 
     // Prepare the webhook configuration payload
     def webhookPayload = JsonOutput.toJson([
-        "name"       : "web",
-        "active"     : true,
-        "events"     : ["push"],
-        "config"     : [
+        "name"   : "web",
+        "active" : true,
+        "events" : ["push"],
+        "config" : [
             "url"          : webhookUrl,
             "content_type" : "json",
             "insecure_ssl" : "0",
@@ -54,20 +52,21 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     ])
 
     // Make the request to GitHub's API to create the webhook
-    def response = httpRequest(
-        url: apiUrl,
-        httpMode: 'POST',
-        customHeaders: [[name: 'Authorization', value: "Bearer ${githubToken}"]],
-        contentType: 'APPLICATION_JSON',
-        requestBody: webhookPayload
+    def response = sh(
+        script: """
+            curl -s -X POST -H "Authorization: Bearer ${githubToken}" \
+                 -H "Content-Type: application/json" \
+                 -d '${webhookPayload}' \
+                 "${apiUrl}"
+        """,
+        returnStdout: true
     )
 
     // Check if the webhook was created successfully
-    def jsonResponse = new JsonSlurper().parseText(response.content)
-    if (response.status == 201) {
+    def jsonResponse = new JsonSlurper().parseText(response)
+    if (jsonResponse.id) {
         echo "Webhook created successfully: ${jsonResponse.url}"
     } else {
         error "Failed to create webhook: ${jsonResponse.message}"
     }
 }
-

@@ -20,5 +20,3 @@
         {{ EMAIL }}
         {{ PORT }}
 
-- import_playbook: trivy-scan.yml
-

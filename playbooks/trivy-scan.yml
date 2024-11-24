@@ -3,12 +3,39 @@
   hosts: kube_servers
   become: yes
   vars:
-    trivy_version: "0.45.1"  # Update this to the latest version as needed
+    trivy_version: "0.45.1"
     docker_image: "{{ IMAGE }}"
-    trivy_severity: "HIGH,CRITICAL"
+    trivy_severity: "{{ trivy_severity | default('HIGH,CRITICAL') }}"
     trivy_results_file: "/tmp/trivy-results.json"
 
   tasks:
+    - name: Ensure required packages are installed
+      apt:
+        name:
+          - curl
+          - ca-certificates
+          - gnupg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker Repository
+      apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: present
+      when: ansible_os_family == "Debian"
+
     - name: Download Trivy
       get_url:
         url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.tar.gz"
@@ -25,6 +52,27 @@
         path: "/usr/local/bin/trivy"
         mode: '0755'
 
+    - name: Check Trivy version
+      command: trivy --version
+      register: trivy_version_check
+      ignore_errors: yes
+
+    - name: Display Trivy version
+      debug:
+        msg: "{{ trivy_version_check.stdout }}"
+      when: trivy_version_check is succeeded
+
+    - name: Pull Docker image
+      docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+      ignore_errors: yes
+      register: docker_pull_result
+
+    - name: Display Docker pull result
+      debug:
+        var: docker_pull_result
+
     - name: Run Trivy scan
       command: >
         trivy image --severity {{ trivy_severity }} 
@@ -33,6 +81,10 @@
         {{ docker_image }}
       register: trivy_scan
       ignore_errors: yes
+
+    - name: Display Trivy scan command output
+      debug:
+        var: trivy_scan
 
     - name: Check if Trivy results file exists
       stat:
@@ -53,4 +105,10 @@
       fail:
         msg: "Trivy found vulnerabilities in the image"
       when: trivy_scan.rc != 0
+
+    - name: Clean up Trivy results file
+      file:
+        path: "{{ trivy_results_file }}"
+        state: absent
+      ignore_errors: yes
 

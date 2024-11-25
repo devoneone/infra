@@ -1,0 +1,46 @@
+---
+- name: Deploy application with Helm to Kubespray cluster
+  hosts: kube_servers
+  become: yes
+  vars:
+    helm_chart_name: "{{ chart_name }}"
+    helm_release_name: "{{ release_name }}"
+    helm_chart_version: "{{ chart_version | default('') }}"
+    helm_values_file: "{{ values_file | default('') }}"
+    helm_namespace: "{{ namespace | default('default') }}"
+  tasks:
+    - name: Ensure Helm is installed
+      command: helm version
+      register: helm_version
+      ignore_errors: yes
+
+    - name: Install Helm if not present
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      when: helm_version.rc != 0
+
+    - name: Add Helm repository (if needed)
+      command: helm repo add {{ helm_repo_name }} {{ helm_repo_url }}
+      when: helm_repo_name is defined and helm_repo_url is defined
+
+    - name: Update Helm repositories
+      command: helm repo update
+
+    - name: Deploy/Upgrade Helm chart
+      command: >
+        helm upgrade --install {{ helm_release_name }} {{ helm_chart_name }}
+        {% if helm_chart_version != '' %}--version {{ helm_chart_version }}{% endif %}
+        {% if helm_values_file != '' %}--values {{ helm_values_file }}{% endif %}
+        --namespace {{ helm_namespace }}
+        --create-namespace
+      register: helm_deploy
+      changed_when: "'Release "{{ helm_release_name }}" has been upgraded' in helm_deploy.stdout or 'Release "{{ helm_release_name }}" has been installed' in helm_deploy.stdout"
+
+    - name: Show Helm deployment status
+      command: helm status {{ helm_release_name }} --namespace {{ helm_namespace }}
+      register: helm_status
+
+    - name: Display Helm status
+      debug:
+        var: helm_status.stdout_lines
+

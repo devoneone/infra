@@ -30,7 +30,7 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         """
 
         // Validate parameters
-        validateParameters(inventoryFile, playbookFile, appName, image, tag ,namespace , domainName)
+        validateParameters(inventoryFile, playbookFile, appName, image,  ,namespace , domainName)
 
         // Execute deployment
         sh """
@@ -53,8 +53,8 @@ def call(String inventoryFile, String playbookFile, String appName, String image
 }
 
 def validateParameters(String inventoryFile, String playbookFile, String appName, 
-                      String image, String namespace, String filePath, 
-                      String domainName, String email) {
+                      String image, String tag, String namespace, 
+                      String domainName) {
     if (!fileExists(inventoryFile)) {
         error "Inventory file not found: ${inventoryFile}"
     }

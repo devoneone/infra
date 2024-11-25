@@ -82,27 +82,3 @@ def writeDockerfile(String projectType, String projectPath, String packageManage
         error "Failed to write Dockerfile for ${projectType} project: ${e.message}"
     }
 }
-
-def pushDockerImage(String dockerImageName, String dockerImageTag, String credentialsId) {
-    try {
-        withCredentials([usernamePassword(credentialsId: credentialsId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-            def dockerHubRepo = "${DOCKER_USER}/${dockerImageName}:${dockerImageTag}"
-
-            // Docker login
-            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-
-            // Tag the image for the registry
-            sh "docker tag ${dockerImageName}:${dockerImageTag} ${dockerHubRepo}"
-
-            // Push the image to Docker Hub
-            sh "docker push ${dockerHubRepo}"
-
-            echo "Image pushed to Docker Hub: ${dockerHubRepo}"
-        }
-    } catch (Exception e) {
-        error "Failed to push Docker image: ${e.message}"
-    } finally {
-        sh "docker logout"
-    }
-}
-

@@ -28,7 +28,7 @@ fi
 
 # 1. Get inputs from parameters
 if [[ $# -lt 5 ]]; then
-    echo "Usage: $0 <chart_name> <image_name> <image_tag> <port> <namespace> [ingress_host]"
+    echo "Usage: $0 <CHART_NAME> <IMAGE> <TAG> <PORT> <NAMESPACE> [HOST]"
     exit 1
 fi
 

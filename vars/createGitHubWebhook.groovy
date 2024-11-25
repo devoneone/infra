@@ -1,7 +1,7 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurperClassic
 
-def call(String repoUrl, String webhookUrl, String githubToken) {
+def createGitHubWebhook(String repoUrl, String webhookUrl, String githubToken) {
     if (!githubToken) {
         echo "GitHub token is null, skipping webhook creation."
         return
@@ -26,10 +26,22 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
             curl -s -H "Authorization: Bearer ${githubToken}" "${apiUrl}"
         """,
         returnStdout: true
-    )
+    ).trim()
 
-    def existingWebhooks = new JsonSlurperClassic().parseText(existingWebhooksResponse)
-    def webhookExists = existingWebhooks.find { it.config.url == webhookUrl }
+    echo "Existing webhooks response: ${existingWebhooksResponse}"
+
+    def existingWebhooks
+    try {
+        existingWebhooks = new JsonSlurperClassic().parseText(existingWebhooksResponse)
+    } catch (Exception e) {
+        error "Failed to parse existing webhooks response: ${e.message}"
+    }
+
+    if (!(existingWebhooks instanceof List)) {
+        error "Unexpected response format for existing webhooks: ${existingWebhooksResponse}"
+    }
+
+    def webhookExists = existingWebhooks.find { it?.config?.url == webhookUrl }
 
     if (webhookExists) {
         echo "Webhook already exists: ${webhookExists.url}"
@@ -58,13 +70,20 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
                  "${apiUrl}"
         """,
         returnStdout: true
-    )
+    ).trim()
 
-    // Check if the webhook was created successfully
-    def jsonResponse = new JsonSlurperClassic().parseText(response)
-    if (jsonResponse.id) {
+    echo "Create webhook response: ${response}"
+
+    def jsonResponse
+    try {
+        jsonResponse = new JsonSlurperClassic().parseText(response)
+    } catch (Exception e) {
+        error "Failed to parse webhook creation response: ${e.message}"
+    }
+
+    if (jsonResponse?.id) {
         echo "Webhook created successfully: ${jsonResponse.url}"
     } else {
-        error "Failed to create webhook: ${jsonResponse.message}"
+        error "Failed to create webhook: ${jsonResponse?.message ?: 'Unknown error'}"
     }
 }

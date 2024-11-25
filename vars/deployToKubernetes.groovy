@@ -1,13 +1,10 @@
-def call(String inventoryFile, String playbookFile, String appName, String image, String namespace, String filePath, String domainName, String email, String port) {
+def call(Map args) {
     sh """
-    ansible-playbook -i ${inventoryFile} ${playbookFile} \
-    -e "APP_NAME=${appName}" \
-    -e "IMAGE=${image}" \
-    -e "NAMESPACE=${namespace}" \
-    -e "FILE_Path=${filePath}" \
-    -e "DOMAIN_NAME=${domainName}" \
-    -e "EMAIL=${email}" \
-    -e "PORT=${port}"
+    helm upgrade --install ${args.appName} ${args.helmChartPath} \
+        --namespace ${args.namespace} --create-namespace \
+        --set image.repository=${args.image} \
+        --set ingress.host=${args.domainName} \
+        --set ingress.email=${args.email} \
+        --set service.port=${args.port}
     """
 }
-

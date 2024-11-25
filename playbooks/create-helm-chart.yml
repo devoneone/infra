@@ -1,0 +1,46 @@
+---
+- name: Create Helm Chart and Update Values
+  hosts: kube_servers
+  become: yes
+  vars:
+    helm_chart_name: "{{ APP_NAME }}-chart"
+    helm_chart_path: "/root/cloudinator/{{ FILE_Path }}/{{ helm_chart_name }}"
+  tasks:
+    - name: Create Helm chart
+      command: >
+        helm create {{ helm_chart_name }}
+      args:
+        chdir: "/root/cloudinator/{{ FILE_Path }}"
+        creates: "{{ helm_chart_path }}"
+
+    - name: Update values.yaml
+      yaml_edit:
+        path: "{{ helm_chart_path }}/values.yaml"
+        update:
+          image:
+            repository: "{{ IMAGE.split(':')[0] }}"
+            tag: "{{ IMAGE.split(':')[1] }}"
+          nameOverride: "{{ APP_NAME }}"
+          fullnameOverride: "{{ APP_NAME }}"
+          service:
+            type: ClusterIP
+            port: "{{ PORT }}"
+          ingress:
+            enabled: true
+            className: nginx
+            hosts:
+              - host: "{{ DOMAIN_NAME }}"
+                paths:
+                  - path: /
+                    pathType: Prefix
+            tls:
+              - secretName: "{{ APP_NAME }}-tls"
+                hosts:
+                  - "{{ DOMAIN_NAME }}"
+
+    - name: Update Chart.yaml with app version
+      yaml_edit:
+        path: "{{ helm_chart_path }}/Chart.yaml"
+        update:
+          appVersion: "{{ IMAGE.split(':')[1] }}"
+

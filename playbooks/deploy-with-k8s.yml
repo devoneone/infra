@@ -19,4 +19,6 @@
         {{ DOMAIN_NAME }} 
         {{ EMAIL }}
         {{ PORT }}
+    - name: create helm chart and update values
+      include_tasks: create-helm-chart.yml
 

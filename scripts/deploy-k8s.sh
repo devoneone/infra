@@ -42,82 +42,25 @@ spec:
           class: nginx
 EOF
 
-# Prepare directory for manifest files
-mkdir -p /root/cloudinator/${FILE_Path}
-cd /root/cloudinator/${FILE_Path}
+# Create Helm chart and update values
+ansible-playbook -i /root/cloudinator/inventory/inventory.ini /root/cloudinator/playbooks/create-helm-chart.yml \
+  -e "APP_NAME=${APP_NAME}" \
+  -e "IMAGE=${IMAGE}" \
+  -e "NAMESPACE=${NAMESPACE}" \
+  -e "FILE_Path=${FILE_Path}" \
+  -e "DOMAIN_NAME=${DOMAIN_NAME}" \
+  -e "EMAIL=${EMAIL}" \
+  -e "PORT=${PORT}"
 
-# Create a Kubernetes deployment and service manifest
-cat <<EOF > ${APP_NAME}-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${APP_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: ${APP_NAME}
-  template:
-    metadata:
-      labels:
-        app: ${APP_NAME}
-    spec:
-      containers:
-      - name: ${APP_NAME}
-        image: ${IMAGE}
-        ports:
-        - containerPort: ${PORT}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${APP_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  type: NodePort
-  selector:
-    app: ${APP_NAME}
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: ${PORT}
-EOF
+# Install/Upgrade Helm chart
+helm upgrade --install ${APP_NAME} /root/cloudinator/${FILE_Path}/${APP_NAME}-chart \
+  --namespace ${NAMESPACE} \
+  --create-namespace \
+  --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod
 
-# Apply deployment and service
-kubectl apply -f ${APP_NAME}-deployment.yaml
-
-# Create an Ingress manifest with TLS
-cat <<EOF > ${APP_NAME}-ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ${APP_NAME}-ingress
-  namespace: ${NAMESPACE}
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-spec:
-  tls:
-  - hosts:
-    - ${DOMAIN_NAME}
-    secretName: ${APP_NAME}-tls
-  rules:
-  - host: ${DOMAIN_NAME}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: ${APP_NAME}
-            port:
-              number: 80
-EOF
-
-# Apply Ingress
-kubectl apply -f ${APP_NAME}-ingress.yaml
+# Wait for deployment to be ready
+kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE}
 
 # Output success message
-echo "Deployment, Service, and Ingress for ${APP_NAME} created successfully in namespace ${NAMESPACE} with HTTPS enabled."
+echo "Helm chart for ${APP_NAME} installed/upgraded successfully in namespace ${NAMESPACE} with HTTPS enabled."
 

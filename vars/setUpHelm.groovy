@@ -30,14 +30,23 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         """
 
         // Validate parameters
-        validateParameters(inventoryFile, playbookFile, appName, image,  ,namespace , domainName)
+        if (!fileExists(inventoryFile)) {
+            error "Inventory file not found: ${inventoryFile}"
+        }
+        if (!fileExists(playbookFile)) {
+            error "Playbook file not found: ${playbookFile}"
+        }
+        if (!appName?.trim()) {
+            error "App name cannot be empty"
+        }
+        // Add more validations as needed
 
         // Execute deployment
         sh """
         ansible-playbook -i ${inventoryFile} ${playbookFile} \
         -e "CHART_NAME=${appName}" \
         -e "IMAGE=${image}" \
-        -e "TAG=${namespace}" \
+        -e "TAG=${tag}" \
         -e "PORT=${port}" \
         -e "NAMESPACE=${namespace}" \
         -e "HOST=${domainName}" 
@@ -49,48 +58,5 @@ def call(String inventoryFile, String playbookFile, String appName, String image
     } finally {
         // Cleanup
         sh "rm -rf ${tmpDir}"
-    }
-}
-
-def validateParameters(String inventoryFile, String playbookFile, String appName, 
-                      String image, String tag, String namespace, 
-                      String domainName) {
-    if (!fileExists(inventoryFile)) {
-        error "Inventory file not found: ${inventoryFile}"
-    }
-    if (!fileExists(playbookFile)) {
-        error "Playbook file not found: ${playbookFile}"
-    }
-    if (!appName?.trim()) {
-        error "App name cannot be empty"
-    }
-    // Add more validation as needed
-}
-
-def detectProjectType(String projectPath = '.') {
-    echo "Detecting project type for path: ${projectPath}"
-    
-    try {
-        if (fileExists("${projectPath}/package.json")) {
-            def packageJson = readJSON file: "${projectPath}/package.json"
-            
-            if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
-                return [type: 'nextjs', port: 3000]
-            } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
-                return [type: 'react', port: 3000]
-            }
-        } else if (fileExists("${projectPath}/pom.xml")) {
-            return [type: 'springboot-maven', port: 8080]
-        } else if (fileExists("${projectPath}/build.gradle") || fileExists("${projectPath}/build.gradle.kts")) {
-            return [type: 'springboot-gradle', port: 8080]
-        } else if (fileExists("${projectPath}/pubspec.yaml")) {
-            return [type: 'flutter', port: 8080]
-        }
-        
-        echo "No specific project type detected, using default configuration"
-        return [type: 'unknown', port: 8080]
-    } catch (Exception e) {
-        echo "Error detecting project type: ${e.message}"
-        return [type: 'unknown', port: 8080]
     }
 }

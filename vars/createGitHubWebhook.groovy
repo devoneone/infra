@@ -1,7 +1,7 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurperClassic
 
-def createGitHubWebhook(String repoUrl, String webhookUrl, String githubToken) {
+def call(String repoUrl, String webhookUrl, String githubToken) {
     if (!githubToken) {
         echo "GitHub token is null, skipping webhook creation."
         return

@@ -1,6 +1,6 @@
 def call(String inventoryFile, String playbookFile, String appName, String image, String namespace, String filePath, String domainName, String email, String port) {
     sh """
-    ansible-playbook -i /root/cloudinator/${inventoryFile} /root/cloudinator/${playbookFile} \
+    ansible-playbook -i ${inventoryFile} ${playbookFile} \
     -e "APP_NAME=${appName}" \
     -e "IMAGE=${image}" \
     -e "NAMESPACE=${namespace}" \

@@ -1,46 +1,97 @@
 ---
 - name: Create Helm Chart and Update Values
-  hosts: kube_servers
-  become: yes
+  hosts: localhost
+  connection: local
+  gather_facts: false
   vars:
     helm_chart_name: "{{ APP_NAME }}-chart"
     helm_chart_path: "/root/cloudinator/{{ FILE_Path }}/{{ helm_chart_name }}"
   tasks:
     - name: Create Helm chart
-      command: >
-        helm create {{ helm_chart_name }}
+      command: helm create {{ helm_chart_name }}
       args:
         chdir: "/root/cloudinator/{{ FILE_Path }}"
         creates: "{{ helm_chart_path }}"
 
-    - name: Update values.yaml
-      yaml_edit:
+    - name: Update image repository in values.yaml
+      lineinfile:
         path: "{{ helm_chart_path }}/values.yaml"
-        update:
-          image:
-            repository: "{{ IMAGE.split(':')[0] }}"
-            tag: "{{ IMAGE.split(':')[1] }}"
-          nameOverride: "{{ APP_NAME }}"
-          fullnameOverride: "{{ APP_NAME }}"
-          service:
-            type: ClusterIP
-            port: "{{ PORT }}"
-          ingress:
-            enabled: true
-            className: nginx
-            hosts:
-              - host: "{{ DOMAIN_NAME }}"
-                paths:
-                  - path: /
-                    pathType: Prefix
-            tls:
-              - secretName: "{{ APP_NAME }}-tls"
-                hosts:
-                  - "{{ DOMAIN_NAME }}"
+        regexp: '^  repository:'
+        line: '  repository: {{ IMAGE.split(":")[0] }}'
 
-    - name: Update Chart.yaml with app version
-      yaml_edit:
+    - name: Update image tag in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^  tag:'
+        line: '  tag: {{ IMAGE.split(":")[1] }}'
+
+    - name: Update nameOverride in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^nameOverride:'
+        line: 'nameOverride: {{ APP_NAME }}'
+
+    - name: Update fullnameOverride in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^fullnameOverride:'
+        line: 'fullnameOverride: {{ APP_NAME }}'
+
+    - name: Update service type in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^  type:'
+        line: '  type: ClusterIP'
+
+    - name: Update service port in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^  port:'
+        line: '  port: {{ PORT }}'
+
+    - name: Enable ingress in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^  enabled:'
+        line: '  enabled: true'
+
+    - name: Update ingress className in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^  className:'
+        line: '  className: nginx'
+
+    - name: Update ingress host in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '^    - host:'
+        line: '    - host: {{ DOMAIN_NAME }}'
+
+    - name: Update ingress path in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '        path:'
+        line: '        path: /'
+
+    - name: Update ingress pathType in values.yaml
+      lineinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        regexp: '        pathType:'
+        line: '        pathType: Prefix'
+
+    - name: Update ingress TLS in values.yaml
+      blockinfile:
+        path: "{{ helm_chart_path }}/values.yaml"
+        block: |
+          tls:
+            - secretName: {{ APP_NAME }}-tls
+              hosts:
+                - {{ DOMAIN_NAME }}
+        insertafter: '  hosts:'
+
+    - name: Update appVersion in Chart.yaml
+      lineinfile:
         path: "{{ helm_chart_path }}/Chart.yaml"
-        update:
-          appVersion: "{{ IMAGE.split(':')[1] }}"
+        regexp: '^appVersion:'
+        line: 'appVersion: {{ IMAGE.split(":")[1] }}'
 

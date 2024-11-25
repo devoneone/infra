@@ -1,7 +1,7 @@
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurperClassic
 
-def call(String repoUrl, String webhookUrl, String githubToken) {
+def createGitHubWebhook(String repoUrl, String webhookUrl, String githubToken) {
     if (!githubToken) {
         echo "GitHub token is null, skipping webhook creation."
         return
@@ -23,7 +23,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     // Fetch existing webhooks
     def existingWebhooksResponse = sh(
         script: """
-            curl -s -H "Authorization: Bearer ${githubToken}" "${apiUrl}"
+            curl -s -H "Authorization: token ${githubToken}" "${apiUrl}"
         """,
         returnStdout: true
     ).trim()
@@ -64,7 +64,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     // Make the request to GitHub's API to create the webhook
     def response = sh(
         script: """
-            curl -s -X POST -H "Authorization: Bearer ${githubToken}" \
+            curl -s -X POST -H "Authorization: token ${githubToken}" \
                  -H "Content-Type: application/json" \
                  -d '${webhookPayload}' \
                  "${apiUrl}"

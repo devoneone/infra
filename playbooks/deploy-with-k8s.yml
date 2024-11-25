@@ -19,6 +19,7 @@
         {{ DOMAIN_NAME }} 
         {{ EMAIL }}
         {{ PORT }}
-    - name: create helm chart and update values
-      include_tasks: create-helm-chart.yml
+
+- name: Create Helm chart and update values
+  import_playbook: create-helm-chart.yml
 

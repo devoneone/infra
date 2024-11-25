@@ -43,7 +43,7 @@ spec:
 EOF
 
 # Create Helm chart and update values
-ansible-playbook -i /root/cloudinator/inventory/inventory.ini /root/cloudinator/playbooks/create-helm-chart.yml \
+ansible-playbook /root/cloudinator/playbooks/create-helm-chart.yml \
   -e "APP_NAME=${APP_NAME}" \
   -e "IMAGE=${IMAGE}" \
   -e "NAMESPACE=${NAMESPACE}" \

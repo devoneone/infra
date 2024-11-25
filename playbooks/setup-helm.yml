@@ -3,13 +3,13 @@
   hosts: kube_servers
   become: yes
   tasks:
-    - name: Copy shell script to Kubernetes server
+    - name: Copy shell set-up helm script to Kubernetes server
       copy:
         src: ../scripts/helm-setup.sh
         dest: /root/cloudinator/helm-setup.sh
         mode: '0755'
 
-    - name: Execute the shell script with dynamic variables
+    - name: Execute the shell script for set up helm chart
       command: >
         bash /root/cloudinator/helm-setup.sh 
         {{ CHART_NAME }} 

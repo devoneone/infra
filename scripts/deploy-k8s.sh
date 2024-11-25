@@ -53,7 +53,7 @@ ansible-playbook /root/cloudinator/playbooks/create-helm-chart.yml \
   -e "PORT=${PORT}"
 
 # Install/Upgrade Helm chart
-helm upgrade --install ${APP_NAME} /root/cloudinator/${FILE_Path}/${APP_NAME}-chart \
+helm upgrade --install ${APP_NAME} /tmp/${FILE_Path}/${APP_NAME}-chart \
   --namespace ${NAMESPACE} \
   --create-namespace \
   --set ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-prod

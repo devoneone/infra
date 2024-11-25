@@ -1,29 +1,15 @@
----
 - name: Create Helm Chart and Update Values
   hosts: localhost
   connection: local
   gather_facts: false
   vars:
     helm_chart_name: "{{ APP_NAME }}-chart"
-    helm_chart_path: "/cloudinator/{{ FILE_Path }}/{{ helm_chart_name }}"
+    helm_chart_path: "/tmp/{{ FILE_Path }}/{{ helm_chart_name }}"
   tasks:
-    - name: Identify the server's public IP address
-      shell: curl -s ifconfig.me
-      register: public_ip
-
-    - debug:
-        msg: "You are on the server with public IP: {{ public_ip.stdout }}"
-        
-    - name: Ensure directory exists
-      file:
-        path: "/cloudinator/{{ FILE_Path }}"
-        state: directory
-        mode: '0755'
-
     - name: Create Helm chart
       command: helm create {{ helm_chart_name }}
       args:
-        chdir: "/cloudinator/{{ FILE_Path }}"
+        chdir: "/tmp/{{ FILE_Path }}"
         creates: "{{ helm_chart_path }}"
 
     - name: Update image repository in values.yaml

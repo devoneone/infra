@@ -7,6 +7,12 @@
     helm_chart_name: "{{ APP_NAME }}-chart"
     helm_chart_path: "/root/cloudinator/{{ FILE_Path }}/{{ helm_chart_name }}"
   tasks:
+    - name: Ensure directory exists
+      file:
+        path: "/root/cloudinator/{{ FILE_Path }}"
+        state: directory
+        mode: '0755'
+
     - name: Create Helm chart
       command: helm create {{ helm_chart_name }}
       args:

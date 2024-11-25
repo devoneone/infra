@@ -11,10 +11,6 @@
 //     """
 // }
 
-
-
-#!/usr/bin/env groovy
-
 def call(String inventoryFile, String playbookFile, String appName, String image, 
          String namespace, String filePath, String domainName, String email, String gitRepoUrl) {
     

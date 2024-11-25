@@ -19,7 +19,3 @@
         {{ DOMAIN_NAME }} 
         {{ EMAIL }}
         {{ PORT }}
-
-# - name: Create Helm chart and update values
-#   import_playbook: create-helm-chart.yml
-

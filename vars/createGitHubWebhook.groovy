@@ -86,4 +86,5 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     } else {
         error "Failed to create webhook: ${jsonResponse?.message ?: 'Unknown error'}"
     }
+    
 }

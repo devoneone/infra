@@ -24,8 +24,3 @@
       register: helm_chart_status
       ignore_errors: yes
     
-    - name: Print the helm chart status
-      command: >
-        curl -v -u "admin:admin" --upload-file
-        /root/cloudinator/cloudinator-app-0.1.0.tgz
-        https://nex.psa-khmer.world/repository/helm-store/

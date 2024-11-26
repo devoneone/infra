@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-NEXUS_URL="https://nex.psa-khmer.world/repository/helm-store/" # Nexus Helm repo URL
+NEXUS_URL="https://reg.psa-khmer.world/repository/helm-store/" # Nexus Helm repo URL
 NEXUS_USER="admin" # Nexus username
 NEXUS_PASS="admin" # Nexus password
 

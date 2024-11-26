@@ -43,6 +43,15 @@ upload_to_nexus() {
     echo "Successfully uploaded $file to Nexus: $NEXUS_URL"
 }
 
+# Function to update the Helm chart version using the TAG
+update_chart_version() {
+    local chart_dir=$1
+    local tag=$2
+
+    echo "Updating chart version to match the provided tag: $tag"
+    yq eval ".version = \"$tag\"" -i "$chart_dir/Chart.yaml"
+    echo "Chart version updated to $tag"
+}
 
 # Check dependencies
 check_dependencies() {
@@ -56,7 +65,6 @@ check_dependencies() {
 
 # Main script execution
 main() {
-    # Validate input
     if [[ $# -lt 5 ]]; then
         echo "Usage: $0 <CHART_NAME> <IMAGE> <TAG> <PORT> <NAMESPACE> [HOST]"
         exit 1
@@ -69,10 +77,8 @@ main() {
     local NAMESPACE=$5
     local HOST=${6:-"example.com"} # Default ingress host
 
-    # Ensure dependencies are installed
     check_dependencies
 
-    # Create Helm chart
     echo "Creating Helm chart: $CHART_NAME"
     helm create "$CHART_NAME"
     cd "$CHART_NAME" || { echo "Error: Failed to access $CHART_NAME directory."; exit 1; }
@@ -87,26 +93,29 @@ main() {
     yq eval ".ingress.enabled = true" -i values.yaml
     yq eval ".ingress.hosts[0].host = \"$HOST\"" -i values.yaml
 
+    # Update chart version using the provided TAG
+    update_chart_version . "$TAG"
+
     echo "Updated values.yaml:"
     cat values.yaml
 
     # Package the Helm chart
     cd ..
     echo "Packaging Helm chart..."
+    local chart_package="${CHART_NAME}-*.tgz"
     helm package "$CHART_NAME" || { echo "Error: Failed to package Helm chart."; exit 1; }
 
-    # Verify the packaged file exists
-    local CHART_PACKAGE="${CHART_NAME}-*.tgz"
-    echo "Looking for packaged file: $CHART_PACKAGE"
-    ls -l $CHART_PACKAGE || { echo "Error: Packaged Helm chart not found."; exit 1; }
+    echo "Looking for packaged file: $chart_package"
+    ls -l $chart_package || { echo "Error: Packaged Helm chart not found."; exit 1; }
 
     # Upload to Nexus
     echo "Uploading Helm chart to Nexus..."
-    upload_to_nexus $CHART_PACKAGE
+    upload_to_nexus $chart_package
 
     # Cleanup
     echo "Cleaning up..."
-    rm -f $CHART_PACKAGE
+    rm -rf "$CHART_NAME"
+    rm -f $chart_package
     echo "Cleanup completed. Script finished successfully."
 }
 

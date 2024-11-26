@@ -23,4 +23,18 @@
       command: helm list | grep {{ CHART_NAME }}
       register: helm_chart_status
       ignore_errors: yes
-    
+
+    - name: Copy sync-helm-to-git script to Kubernetes server
+      copy:
+        src: ../scripts/sync-helm-to-git.sh
+        dest: /root/cloudinator/sync-helm-to-git.sh
+        mode: '0755'
+
+    - name: Execute the sync-helm-to-git script
+      command: >
+        bash /root/cloudinator/sync-helm-to-git.sh
+        {{ CHART_NAME }}
+        {{ TAG }}
+      environment:
+        GIT_SSL_NO_VERIFY: "true"
+

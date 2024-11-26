@@ -99,5 +99,5 @@ zip "$ZIP_FILE" $CHART_PACKAGE || { echo "Error: Failed to zip the Helm chart.";
 upload_to_nexus "$ZIP_FILE"
 
 # Cleanup
-# rm -f "$ZIP_FILE" $CHART_PACKAGE
-# echo "Cleanup completed. Script finished successfully."
+rm -f "$ZIP_FILE" $CHART_PACKAGE
+echo "Cleanup completed. Script finished successfully."

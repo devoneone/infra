@@ -52,13 +52,6 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         -e "HOST=${domainName}" 
         """
         
-        // Execute sync-helm-to-git script
-        sh """
-        ansible-playbook -i ${inventoryFile} ${playbookFile} \
-        -e "CHART_NAME=${appName}" \
-        -e "TAG=${tag}"
-        """
-        
     } catch (Exception e) {
         echo "Deployment failed: ${e.message}"
         throw e
@@ -67,4 +60,3 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         sh "rm -rf ${tmpDir}"
     }
 }
-

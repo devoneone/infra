@@ -1,0 +1,137 @@
+@Library('cloudinator') _
+pipeline {
+    agent any
+    environment {
+        GIT_REPO_URL    = 'https://github.com/ruos-sovanra/spring-ops.git'
+        GIT_BRANCH      = 'main'
+        DOCKER_IMAGE_NAME = 'sovanra/spring'
+        DOCKER_IMAGE_TAG = '${BUILD_NUMBER}'
+        DOCKER_CREDENTIALS_ID = 'docker'
+        GIT_INFRA_URL = 'https://github.com/ruos-sovanra/infra-final.git'
+        INVENTORY_FILE = 'inventory/inventory.ini'
+        PLAYBOOK_FILE = 'playbooks/deploy-with-k8s.yml'
+        APP_NAME= 'cloudinator-app'
+        FILE_Path = "deployments/${APP_NAME}"
+        IMAGE = "${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+        NAMESPACE="cloudinator" 
+        DOMAIN_NAME = "spring-kk.psa-khmer.world"
+        EMAIL = "your-email@example.com"
+        DETECTED_PORT = '3000'
+        GITHUB_TOKEN = "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"
+        WEBHOOK_URL = 'https://jenkin.psa-khmer.world/github-webhook/'
+        TRIVY_SEVERITY = "HIGH,CRITICAL"
+        TRIVY_EXIT_CODE = "0"
+        TRIVY_IGNORE_UNFIXED = "true"
+        VULN_THRESHOLD = "5"
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: env.GIT_BRANCH, url: env.GIT_REPO_URL
+            }
+        }
+        stage('Generate Dockerfile') {
+            steps {
+                script {
+                    def projectInfo = detectProjectType("${env.WORKSPACE}")
+                    env.DETECTED_PORT = projectInfo.port
+                    echo "Detected port: ${env.DETECTED_PORT}"
+                }
+            }
+        }
+        stage('Update Dependencies') {
+            steps {
+                script {
+                    updateDependencies()
+                }
+            }
+        }
+        
+        // stage('Run Tests') {
+        //     steps {
+        //         script {
+        //             runTests()
+        //         }
+        //     }
+        // }
+        
+        stage('Docker Login') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'docker', variable: 'DOCKER_PWD')]) {
+                        sh "echo $DOCKER_PWD | docker login -u sovanra --password-stdin"
+                    }
+                }
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerBuild("${DOCKER_IMAGE_NAME}", "${DOCKER_IMAGE_TAG}")
+                }
+            }
+        }
+        
+        stage('Trivy Scan') {
+            steps {
+                script {
+                    def vulnerabilitiesCount = trivyScan(
+                        DOCKER_IMAGE_NAME,
+                        DOCKER_IMAGE_TAG,
+                        TRIVY_SEVERITY,
+                        TRIVY_EXIT_CODE,
+                        TRIVY_IGNORE_UNFIXED,
+                        VULN_THRESHOLD.toInteger()
+                    )
+                    echo "Total vulnerabilities found: ${vulnerabilitiesCount}"
+                }
+            }
+        }
+        
+        stage('Push Image to Registry') {
+            steps {
+                script {
+                    dockerPush("${DOCKER_IMAGE_NAME}", "${DOCKER_IMAGE_TAG}")
+                }
+            }
+        }
+        stage('Clone infra') {
+            steps {
+                git branch: env.GIT_BRANCH, url: env.GIT_INFRA_URL
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    deployToKubernetes(
+                        INVENTORY_FILE,
+                        PLAYBOOK_FILE,
+                        APP_NAME,
+                        IMAGE,
+                        NAMESPACE,
+                        FILE_Path,
+                        DOMAIN_NAME,
+                        EMAIL,
+                        DETECTED_PORT
+                    )
+                }
+            }
+        }
+        stage('Setup GitHub Webhook') {
+            steps {
+                script {
+                    createGitHubWebhook(env.GIT_REPO_URL, env.WEBHOOK_URL, env.GITHUB_TOKEN)
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            script {
+                rollback()
+            }
+        }
+    }
+}
+

@@ -23,13 +23,26 @@ install_yq() {
 # Function to upload chart to Nexus
 upload_to_nexus() {
     local file=$1
-    echo "Uploading $file to Nexus Helm repository..."
-    curl -v -u "$NEXUS_USER:$NEXUS_PASS" --upload-file "$file" "$NEXUS_URL" || {
+
+    # Debug: Confirm file existence before upload
+    if [[ ! -f "$file" ]]; then
+        echo "Error: File $file does not exist. Cannot upload to Nexus."
+        exit 1
+    fi
+
+    echo "Uploading $file to Nexus Helm repository: $NEXUS_URL"
+    
+    # Add verbose logging to curl
+    curl -v -u "$NEXUS_USER:$NEXUS_PASS" \
+         --upload-file "$file" \
+         "$NEXUS_URL" || {
         echo "Error: Failed to upload $file to Nexus repository."
         exit 1
     }
-    echo "Successfully uploaded $file to Nexus."
+
+    echo "Successfully uploaded $file to Nexus: $NEXUS_URL"
 }
+
 
 # Check dependencies
 check_dependencies() {

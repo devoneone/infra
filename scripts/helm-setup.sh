@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-NEXUS_URL="http://localhost:8081/repository/helm-repo/" # Replace with your Nexus Helm repo URL
+NEXUS_URL="https://nex.psa-khmer.world/repository/helm-store/" # Nexus Helm repo URL
 NEXUS_USER="admin" # Nexus username
-NEXUS_PASS="admin123" # Nexus password
+NEXUS_PASS="admin" # Nexus password
 
 # Function to install yq
 install_yq() {
@@ -20,10 +20,31 @@ install_yq() {
     echo "'yq' installed successfully."
 }
 
+# Function to upload chart to Nexus
+upload_to_nexus() {
+    local chart_file=$1
+    echo "Uploading $chart_file to Nexus Helm repository..."
+    curl -u "$NEXUS_USER:$NEXUS_PASS" --upload-file "$chart_file" "$NEXUS_URL" || {
+        echo "Error: Failed to upload the chart to Nexus repository."
+        exit 1
+    }
+    echo "Chart uploaded successfully."
+}
+
 # Check for dependencies
 if ! command -v yq &> /dev/null; then
     echo "'yq' is not installed."
     install_yq
+fi
+
+if ! command -v helm &> /dev/null; then
+    echo "Error: 'helm' is not installed. Please install it first."
+    exit 1
+fi
+
+if ! command -v zip &> /dev/null; then
+    echo "Error: 'zip' is not installed. Please install it first."
+    exit 1
 fi
 
 # 1. Get inputs from parameters
@@ -63,3 +84,19 @@ fi
 
 echo "Updated values.yaml:"
 cat values.yaml
+
+# 4. Package the Helm chart
+cd ..
+helm package "$CHART_NAME" || { echo "Error: Failed to package the Helm chart."; exit 1; }
+
+# 5. Zip the Helm chart
+CHART_PACKAGE="${CHART_NAME}-*.tgz"
+ZIP_FILE="${CHART_NAME}.zip"
+zip "$ZIP_FILE" $CHART_PACKAGE || { echo "Error: Failed to zip the Helm chart."; exit 1; }
+
+# 6. Upload to Nexus
+upload_to_nexus "$ZIP_FILE"
+
+# Cleanup
+rm -f "$ZIP_FILE" $CHART_PACKAGE
+echo "Cleanup completed. Script finished successfully."

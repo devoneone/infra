@@ -4,9 +4,9 @@
 NEXUS_URL="https://nex.psa-khmer.world/repository/helm-store/"
 NEXUS_USER="admin"
 NEXUS_PASS="admin"
-GIT_REPO_URL="https://github.com/your-organization/helm-charts.git"
-GIT_USER="your-git-username"
-GIT_TOKEN="your-git-personal-access-token"
+GIT_REPO_URL="https://github.com/ruos-sovanra/argocd.git"
+GIT_USER="ruos-sovanra"
+GIT_TOKEN="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"
 
 # Function to download the Helm chart from Nexus
 download_helm_chart() {

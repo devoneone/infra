@@ -19,10 +19,10 @@
         {{ NAMESPACE }} 
         {{ HOST }}
     
-    - name: Check if the helm chart is installed
-      command: helm list | grep {{ CHART_NAME }}
-      register: helm_chart_status
-      ignore_errors: yes
+    # - name: Check if the helm chart is installed
+    #   command: helm list | grep {{ CHART_NAME }}
+    #   register: helm_chart_status
+    #   ignore_errors: yes
 
     - name: Copy sync-helm-to-git script to Kubernetes server
       copy:

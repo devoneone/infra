@@ -1,86 +1,78 @@
 #!/bin/bash
 
-# Configuration
-NEXUS_URL="https://nex.psa-khmer.world/repository/helm-store/"
-NEXUS_USER="admin"
-NEXUS_PASS="admin"
-GIT_REPO_URL="https://github.com/ruos-sovanra/argocd.git"
-GIT_USER="ruos-sovanra"
-GIT_TOKEN="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"
+# Set variables
+REPO_NAME="helm-store"
+REPO_URL="https://nex.psa-khmer.world/repository/helm-store/"
+USERNAME="admin"
+PASSWORD="admin"
+CHART_NAME="cloudinator-app"
+CHART_VERSION="134"
+CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
+GITLAB_API_URL="https://git.shinoshike.studio/api/v4/projects"
+GITLAB_TOKEN="glpat-xBEAzy-73hWdWatMxCqd"
+PROJECT_NAME="this is my name"
+NAMESPACE_ID=44
+VISIBILITY="public"
 
-# Function to download the Helm chart from Nexus
-download_helm_chart() {
-    local chart_name=$1
-    local chart_version=$2
-    local chart_file="${chart_name}-${chart_version}.tgz"
+# Add the Nexus Helm repository
+echo "Adding Helm repository: $REPO_NAME"
+helm repo add $REPO_NAME $REPO_URL --username $USERNAME --password $PASSWORD
 
-    echo "Downloading Helm chart ${chart_file} from Nexus..."
-    curl -u "${NEXUS_USER}:${NEXUS_PASS}" -O "${NEXUS_URL}/${chart_file}"
+# Update Helm repositories
+echo "Updating Helm repositories..."
+helm repo update
 
-    if [ ! -f "${chart_file}" ]; then
-        echo "Error: Failed to download ${chart_file} from Nexus."
-        exit 1
-    fi
-}
+# Pull the specified Helm chart
+echo "Pulling Helm chart: $CHART_NAME, version: $CHART_VERSION"
+helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
 
-# Function to unzip the Helm chart
-unzip_helm_chart() {
-    local chart_file=$1
+# Extract the Helm chart
+echo "Extracting Helm chart..."
+tar -zxvf $CHART_FILE
 
-    echo "Unzipping Helm chart ${chart_file}..."
-    tar -xzvf "${chart_file}"
+# Remove the .tgz file after extraction
+echo "Removing the .tgz file: $CHART_FILE"
+rm -f $CHART_FILE
 
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to unzip ${chart_file}."
-        exit 1
-    fi
-}
+# Change directory to the extracted chart
+cd ${CHART_NAME}-${CHART_VERSION}
 
-# Function to initialize Git repository and push to remote
-sync_to_git() {
-    local chart_name=$1
+# List the contents of the extracted chart
+echo "Listing contents of the extracted chart directory:"
+ll
 
-    echo "Initializing Git repository for ${chart_name}..."
-    cd "${chart_name}"
-    git init
+# Create a project in GitLab using the API
+echo "Creating a project in GitLab..."
+REPO_RESPONSE=$(curl --silent --request POST \
+  --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+  --data "name=$PROJECT_NAME&namespace_id=$NAMESPACE_ID&visibility=$VISIBILITY" \
+  "$GITLAB_API_URL")
 
-    echo "Adding files to Git..."
-    git add .
+# Extract the GitLab repository URL from the response
+REPO_URL=$(echo $REPO_RESPONSE | jq -r '.ssh_url_to_repo')
+if [ "$REPO_URL" == "null" ]; then
+  echo "Failed to create GitLab project. Response: $REPO_RESPONSE"
+  exit 1
+fi
+echo "GitLab repository created: $REPO_URL"
 
-    echo "Committing changes..."
-    git commit -m "Update Helm chart: ${chart_name}"
+# Initialize a Git repository
+echo "Initializing Git repository..."
+git init
 
-    echo "Setting up Git remote..."
-    git remote add origin "${GIT_REPO_URL}"
+# Add a remote pointing to the GitLab repository
+echo "Adding remote Git repository..."
+git remote add origin $REPO_URL
 
-    echo "Pushing to Git repository..."
-    git push -u origin master
+# Create a `main` branch and make the initial commit
+echo "Setting up main branch and making the initial commit..."
+git branch -M main
+git add .
+git commit -m "Initial commit"
 
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to push to Git repository."
-        exit 1
-    fi
+# Push the code to the newly created GitLab repository
+echo "Pushing code to the remote repository..."
+git push -u origin main
 
-    echo "Successfully synced ${chart_name} to Git repository."
-}
-
-# Main execution
-main() {
-    if [ $# -ne 2 ]; then
-        echo "Usage: $0 <chart_name> <chart_version>"
-        exit 1
-    fi
-
-    local chart_name=$1
-    local chart_version=$2
-
-    download_helm_chart "${chart_name}" "${chart_version}"
-    unzip_helm_chart "${chart_name}-${chart_version}.tgz"
-    sync_to_git "${chart_name}"
-
-    echo "Helm chart successfully synced to Git repository."
-}
-
-# Run the script
-main "$@"
-
+# End of script
+echo "Helm chart $CHART_NAME version $CHART_VERSION has been pulled, extracted, added to Git, and pushed to $REPO_URL successfully."

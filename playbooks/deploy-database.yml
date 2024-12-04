@@ -6,12 +6,12 @@
     - name: Copy database deployment script to Kubernetes server
       copy:
         src: ../scripts/deploy-database.sh
-        dest: /root/cloudinator/deploy-database.sh
+        dest: /home/sen/cloudinator/deploy-database.sh
         mode: '0755'
 
     - name: Execute the database deployment script
       command: >
-        bash /root/cloudinator/deploy-database.sh 
+        bash /home/sen/cloudinator/deploy-database.sh 
         {{ DB_NAME }} 
         {{ DB_IMAGE }} 
         {{ NAMESPACE }} 

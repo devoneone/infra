@@ -43,8 +43,8 @@ spec:
 EOF
 
 # Prepare directory for manifest files
-mkdir -p /root/cloudinator/${FILE_Path}
-cd /root/cloudinator/${FILE_Path}
+mkdir -p /home/sen/cloudinator/${FILE_Path}
+cd /home/sen/cloudinator/${FILE_Path}
 
 # Create a Kubernetes deployment and service manifest
 cat <<EOF > ${APP_NAME}-deployment.yaml

@@ -5,9 +5,10 @@ DB_NAME=$1
 DB_IMAGE=$2
 NAMESPACE=${3:-default}
 DB_PASSWORD=$4
-DOMAIN_NAME=$5
-EMAIL=$6
-STORAGE_SIZE=${7:-1Gi}
+DB_USERNAME=${5:-defaultUser}  # Added username variable with a default value
+DOMAIN_NAME=$6
+EMAIL=$7
+STORAGE_SIZE=${8:-1Gi}
 
 # Exit on error
 set -e
@@ -15,8 +16,9 @@ set -e
 # Create namespace if not exists
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-# Create secret for database password
+# Create secret for database credentials
 kubectl create secret generic ${DB_NAME}-secret \
+  --from-literal=username=${DB_USERNAME} \
   --from-literal=password=${DB_PASSWORD} \
   --namespace=${NAMESPACE} \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -57,13 +59,18 @@ spec:
       - name: ${DB_NAME}
         image: ${DB_IMAGE}
         env:
-        - name: ${DB_TYPE == "postgres" ? "POSTGRES_PASSWORD" : "MONGO_INITDB_ROOT_PASSWORD"}
+        - name: ${DB_IMAGE} == *"postgres"* ? "POSTGRES_USER" : "MONGO_INITDB_ROOT_USERNAME"
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: username
+        - name: ${DB_IMAGE} == *"postgres"* ? "POSTGRES_PASSWORD" : "MONGO_INITDB_ROOT_PASSWORD"
           valueFrom:
             secretKeyRef:
               name: ${DB_NAME}-secret
               key: password
         ports:
-        - containerPort: ${DB_TYPE == "postgres" ? 5432 : 27017}
+        - containerPort: ${DB_IMAGE} == *"postgres"* ? 5432 : 27017
         volumeMounts:
         - name: ${DB_NAME}-storage
           mountPath: /data/db
@@ -105,5 +112,5 @@ spec:
           service:
             name: ${DB_NAME}
             port:
-              number: ${DB_TYPE == "postgres" ? 5432 : 27017}
+              number: ${DB_IMAGE} == *"postgres"* ? 5432 : 27017
 EOF

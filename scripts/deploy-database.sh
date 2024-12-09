@@ -101,6 +101,22 @@ spec:
           claimName: ${DB_NAME}-pvc
 EOF
 
+# Create a Service for the database
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${DB_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app: ${DB_NAME}
+  ports:
+    - protocol: TCP
+      port: ${DB_PORT}          # The port that the service will listen on
+      targetPort: ${DB_PORT}    # The port the pod is exposing
+EOF
+
 # Create an Ingress resource for the database
 cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1

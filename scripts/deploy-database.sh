@@ -7,37 +7,21 @@ NAMESPACE=${3:-default}
 DB_PASSWORD=$4
 DOMAIN_NAME=$5
 EMAIL=$6
+STORAGE_SIZE=${7:-1Gi}
 
-# Check if required variables are provided
-if [ -z "$DB_NAME" ] || [ -z "$DB_IMAGE" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DOMAIN_NAME" ] || [ -z "$EMAIL" ]; then
-  echo "Usage: $0 <DB_NAME> <DB_IMAGE> [NAMESPACE] <DB_PASSWORD> <DOMAIN_NAME> <EMAIL>"
-  exit 1
-fi
+# Exit on error
+set -e
 
-# Determine database type based on image name
-if [[ $DB_IMAGE == *"mongo"* ]]; then
-  DB_TYPE="mongodb"
-  ENV_VAR_NAME="MONGO_INITDB_ROOT_PASSWORD"
-  CONTAINER_PORT=27017
-elif [[ $DB_IMAGE == *"postgres"* ]]; then
-  DB_TYPE="postgres"
-  ENV_VAR_NAME="POSTGRES_PASSWORD"
-  CONTAINER_PORT=5432
-else
-  echo "Unsupported database image: $DB_IMAGE"
-  exit 1
-fi
-
-# Create namespace if it doesn't exist
+# Create namespace if not exists
 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 
-# Create a secret for the database password
+# Create secret for database password
 kubectl create secret generic ${DB_NAME}-secret \
   --from-literal=password=${DB_PASSWORD} \
   --namespace=${NAMESPACE} \
   --dry-run=client -o yaml | kubectl apply -f -
 
-# Create a PersistentVolumeClaim for the database
+# Create PersistentVolumeClaim
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -49,10 +33,10 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: ${STORAGE_SIZE}
 EOF
 
-# Create the database deployment
+# Deploy database
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -73,36 +57,30 @@ spec:
       - name: ${DB_NAME}
         image: ${DB_IMAGE}
         env:
-        - name: ${ENV_VAR_NAME}
+        - name: ${DB_TYPE == "postgres" ? "POSTGRES_PASSWORD" : "MONGO_INITDB_ROOT_PASSWORD"}
           valueFrom:
             secretKeyRef:
               name: ${DB_NAME}-secret
               key: password
         ports:
-        - containerPort: ${CONTAINER_PORT}
+        - containerPort: ${DB_TYPE == "postgres" ? 5432 : 27017}
         volumeMounts:
         - name: ${DB_NAME}-storage
           mountPath: /data/db
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
       volumes:
       - name: ${DB_NAME}-storage
         persistentVolumeClaim:
           claimName: ${DB_NAME}-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${DB_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  selector:
-    app: ${DB_NAME}
-  ports:
-    - protocol: TCP
-      port: ${CONTAINER_PORT}
-      targetPort: ${CONTAINER_PORT}
 EOF
 
-# Create an Ingress for the database (if needed)
+# Create Ingress
 cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -127,8 +105,5 @@ spec:
           service:
             name: ${DB_NAME}
             port:
-              number: ${CONTAINER_PORT}
+              number: ${DB_TYPE == "postgres" ? 5432 : 27017}
 EOF
-
-echo "Database ${DB_NAME} (${DB_TYPE}) deployed successfully in namespace ${NAMESPACE} with HTTPS enabled."
-

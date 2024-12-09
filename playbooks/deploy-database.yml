@@ -17,5 +17,5 @@
         {{ NAMESPACE }} 
         {{ DB_PASSWORD }} 
         {{ DOMAIN_NAME }} 
-        {{ EMAIL }}
-
+        {{ EMAIL }} 
+        {{ STORAGE_SIZE }}

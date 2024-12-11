@@ -33,7 +33,11 @@ def dockerfileExists(String projectPath) {
 
 def detectProjectType(String projectPath) {
     echo "Checking for package.json in ${projectPath}"
-    if (fileExists("${projectPath}/package.json")) {
+    if (fileExists("${projectPath}/artisan")) {
+        echo "Laravel project detected"
+        return [type: 'laravel', port: 8000]
+    }
+    else if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"
         echo "package.json contents: ${packageJson}"
 
@@ -83,10 +87,7 @@ def detectProjectType(String projectPath) {
     } else if (fileExists("${projectPath}/index.php")) {
         echo "PHP project detected"
         return [type: 'php']
-    } else if (fileExists("${projectPath}/artisan")) {
-        echo "Laravel project detected"
-        return [type: 'laravel', port: 8000]
-    }
+    } 
 
     //Detecting Backend Projects
     else if (fileExists("${projectPath}/pom.xml")) {

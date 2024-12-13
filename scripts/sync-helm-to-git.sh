@@ -78,7 +78,7 @@ add_helm_repo() {
 pull_and_extract_chart() {
   log "INFO: Pulling Helm chart: $CHART_NAME, version: $CHART_VERSION"
 
-  # Pull the Helm chart archive if it doesn't exist
+  # Pull the Helm chart archive
   if [ ! -f "$CHART_FILE" ]; then
     helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
   else
@@ -92,20 +92,44 @@ pull_and_extract_chart() {
   if [ -d "$CHART_NAME" ]; then
     log "INFO: Directory $CHART_NAME already exists. Removing specific files and folders."
 
-    # Remove specific files and directories
-    rm -f "$CHART_NAME/.helmignore" "$CHART_NAME/Chart.yaml" "$CHART_NAME/values.yaml"
-    rm -rf "$CHART_NAME/templates"
+    # Ensure the script has permissions to modify the directory
+    if [ ! -w "$CHART_NAME" ]; then
+      log "ERROR: Insufficient permissions to modify directory: $CHART_NAME"
+      exit 1
+    fi
+
+    # Remove specific files and directories with proper error handling
+    rm -f "$CHART_NAME/.helmignore" "$CHART_NAME/Chart.yaml" "$CHART_NAME/values.yaml" 2>/dev/null || {
+      log "ERROR: Failed to remove files in $CHART_NAME. Check permissions."
+      exit 1
+    }
+    rm -rf "$CHART_NAME/templates" 2>/dev/null || {
+      log "ERROR: Failed to remove templates directory. Check permissions."
+      exit 1
+    }
 
     # Extract chart files
-    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1
+    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1 || {
+      log "ERROR: Failed to extract Helm chart files."
+      exit 1
+    }
   else
-    mkdir "$CHART_NAME"
-    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1
+    mkdir -p "$CHART_NAME" || {
+      log "ERROR: Failed to create directory $CHART_NAME. Check permissions."
+      exit 1
+    }
+    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1 || {
+      log "ERROR: Failed to extract Helm chart files."
+      exit 1
+    }
   fi
 
   # Clean up the Helm chart archive
   log "INFO: Cleaning up Helm chart archive: $CHART_FILE"
-  rm -f $CHART_FILE
+  rm -f $CHART_FILE || {
+    log "ERROR: Failed to remove Helm chart archive: $CHART_FILE"
+    exit 1
+  }
 
   log "INFO: Helm chart pull and extraction completed."
 }

@@ -10,7 +10,4 @@
         mode: '0755'
 
     - name: Sync helm chart to git
-      command: >
-        bash /home/sen/cloudinator/sync-helm-to-git.sh
-        {{ CHART_NAME }} 
-        {{ CHART_VERSION }} 
+      command: sh /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }} 

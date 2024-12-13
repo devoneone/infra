@@ -1,18 +1,32 @@
 ---
-- name: Sync ArgoCD with Kubernetes applications and helm charts
+- name: Sync ArgoCD with Kubernetes applications and Helm charts
   hosts: kube_servers
   become: true
-  become_user: sen
   tasks:
-    - name: copy the sync helm to git script
+    - name: Copy the sync Helm to Git script
       copy:
         src: ../scripts/sync-helm-to-git.sh
         dest: /home/sen/cloudinator/sync-helm-to-git.sh
         mode: '0755'
+        owner: sen
+        group: sen
 
-    - name: Sync helm chart to git
-      become: true
+    - name: Ensure the target directory is writable
+      file:
+        path: /home/sen/cloudinator
+        mode: '0755'
+        owner: sen
+        group: sen
+        state: directory
+
+    - name: Sync Helm chart to Git
       become_user: sen
-      command: bash /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }} 
+      command: bash /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }}
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin"
+      register: sync_result
+      ignore_errors: yes
+
+    - name: Debug sync result
+      debug:
+        msg: "{{ sync_result.stdout }}"

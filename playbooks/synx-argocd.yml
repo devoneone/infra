@@ -3,13 +3,13 @@
   hosts: kube_servers
   become: yes
   tasks:
-    - name: Copy database deployment script to Kubernetes server
+    - name: copy the sync helm to git script
       copy:
         src: ../scripts/sync-helm-to-git.sh
         dest: /home/sen/cloudinator/sync-helm-to-git.sh
         mode: '0755'
 
-    - name: Execute the database deployment script
+    - name: Sync helm chart to git
       command: >
         bash /home/sen/cloudinator/sync-helm-to-git.sh
         {{ CHART_NAME }} 

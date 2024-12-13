@@ -1,7 +1,8 @@
 ---
 - name: Sync ArgoCD with Kubernetes applications and helm charts
   hosts: kube_servers
-  become: yes
+  become: true
+  become_user: sen
   tasks:
     - name: copy the sync helm to git script
       copy:

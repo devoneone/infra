@@ -88,7 +88,7 @@ main() {
     yq eval ".name = \"$CHART_NAME\"" -i values.yaml
     yq eval ".image.repository = \"$IMAGE\"" -i values.yaml
     yq eval ".image.tag = \"$TAG\"" -i values.yaml
-    yq eval ".port = $PORT" -i values.yaml
+    yq eval ".service.port = $PORT" -i values.yaml
     yq eval ".namespace = \"$NAMESPACE\"" -i values.yaml
     yq eval ".ingress.enabled = true" -i values.yaml
     yq eval ".ingress.hosts[0].host = \"$HOST\"" -i values.yaml

@@ -11,6 +11,6 @@
 
     - name: Sync helm chart to git
       become: true
-      command: sh /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }} 
+      command: bash /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }} 
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin"

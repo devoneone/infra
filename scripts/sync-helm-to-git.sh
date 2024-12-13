@@ -25,6 +25,7 @@ ARGOCD_SERVER="argocd.soben.me"
 ARGOCD_APP_NAME="${CHART_NAME}"
 ARGOCD_USERNAME="admin"
 ARGOCD_PASSWORD=${ARGOCD_PASSWORD:-"2eo10JZVXDr5CVba"}
+TARGET_DIR="/home/sen/cloudinator"
 
 # Logging function
 log() {
@@ -83,6 +84,9 @@ add_helm_repo() {
 pull_and_extract_chart() {
   log "INFO: Pulling Helm chart: $CHART_NAME, version: $CHART_VERSION"
 
+  # Navigate to target directory
+  cd "$TARGET_DIR" || { log "ERROR: Failed to navigate to target directory: $TARGET_DIR"; exit 1; }
+
   # Pull the Helm chart archive if it doesn't exist
   if [ ! -f "$CHART_FILE" ]; then
     helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
@@ -114,6 +118,7 @@ pull_and_extract_chart() {
 
   log "INFO: Helm chart pull and extraction completed."
 }
+
 
 # Check if GitLab repository exists
 check_gitlab_repo() {

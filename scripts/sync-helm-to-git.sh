@@ -54,9 +54,13 @@ install_tools() {
   log "INFO: All required tools are installed."
 }
 
-# Add Helm repository and update
+# Add Helm repository and update in the current directory
 add_helm_repo() {
   log "INFO: Adding Helm repository: $REPO_NAME"
+
+  # Change to the current directory
+  log "INFO: Using current directory: $(pwd)"
+
   if helm repo list | grep -q "$REPO_NAME"; then
     log "INFO: Repository $REPO_NAME already exists. Updating instead."
     helm repo update
@@ -71,6 +75,7 @@ add_helm_repo() {
       exit 1
     fi
   fi
+
   log "INFO: Helm repositories updated successfully."
 }
 
@@ -109,8 +114,6 @@ pull_and_extract_chart() {
 
   log "INFO: Helm chart pull and extraction completed."
 }
-
-
 
 # Check if GitLab repository exists
 check_gitlab_repo() {
@@ -165,31 +168,28 @@ push_to_gitlab() {
   cd "$CHART_NAME"
 
   if [ -d .git ]; then
-  log "INFO: .git directory exists. Adding and pushing changes."
-  git add .
-  git commit -m "Update Helm chart"
-  git push
-else
-  log "INFO: .git directory missing or corrupted. Reinitializing repository."
-  git init
-  git branch -M main
-  git remote add origin "$SSH_REPO"
-  git add .
-  git commit -m "Initial commit"
-  git push -u origin main
-fi
-
+    log "INFO: .git directory exists. Adding and pushing changes."
+    git add .
+    git commit -m "Update Helm chart"
+    git push
+  else
+    log "INFO: .git directory missing or corrupted. Reinitializing repository."
+    git init
+    git branch -M main
+    git remote add origin "$SSH_REPO"
+    git add .
+    git commit -m "Initial commit"
+    git push -u origin main
+  fi
 
   log "INFO: Helm chart pushed successfully."
   cd ..
 }
 
-
 # Create ArgoCD application
 create_argocd_app() {
-
   log "INFO: Creating ArgoCD application $ARGOCD_APP_NAME..."
-cat <<EOF | kubectl apply -f -
+  cat <<EOF | kubectl apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

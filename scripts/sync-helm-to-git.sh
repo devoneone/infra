@@ -80,10 +80,16 @@ pull_and_extract_chart() {
 
   # Pull the Helm chart archive
   if [ ! -f "$CHART_FILE" ]; then
-    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
+    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION || {
+      log "ERROR: Failed to pull Helm chart $CHART_NAME."
+      exit 1
+    }
   else
     log "INFO: Helm chart archive $CHART_FILE already exists. Overriding with new version."
-    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
+    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION || {
+      log "ERROR: Failed to pull Helm chart $CHART_NAME."
+      exit 1
+    }
   fi
 
   log "INFO: Extracting Helm chart..."
@@ -95,7 +101,11 @@ pull_and_extract_chart() {
     # Ensure the script has permissions to modify the directory
     if [ ! -w "$CHART_NAME" ]; then
       log "ERROR: Insufficient permissions to modify directory: $CHART_NAME"
-      exit 1
+      log "INFO: Attempting to fix permissions with sudo..."
+      sudo chmod -R u+w "$CHART_NAME" || {
+        log "ERROR: Unable to modify permissions for directory: $CHART_NAME"
+        exit 1
+      }
     fi
 
     # Remove specific files and directories with proper error handling

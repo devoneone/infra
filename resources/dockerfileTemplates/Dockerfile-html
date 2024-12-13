@@ -2,7 +2,7 @@
 FROM nginx:stable-alpine
 
 # Copy only necessary files to the image
-COPY ./ /usr/share/nginx/html
+COPY . /usr/share/nginx/html
 
 # Ensure proper file permissions
 RUN chmod -R 755 /usr/share/nginx/html

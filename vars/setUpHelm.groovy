@@ -19,7 +19,7 @@ def call(String inventoryFile, String playbookFile, String appName, String image
             error "Failed to detect project type for repository: ${gitRepoUrl}"
         }
         
-        def port = projectInfo.port ?: 8080
+        def port = projectInfo.port ?: 80
         
         echo """
         Project Detection Results:

@@ -225,11 +225,16 @@ sync_with_argocd() {
   log "INFO: Logging in to ArgoCD..."
   argocd login $ARGOCD_SERVER --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD --insecure --grpc-web
 
+  log "INFO: Enabling auto-sync for application $ARGOCD_APP_NAME..."
+  argocd app set $ARGOCD_APP_NAME --sync-policy automated \
+    --self-heal --prune || log "ERROR: Failed to enable auto-sync for $ARGOCD_APP_NAME."
+
   log "INFO: Synchronizing application $ARGOCD_APP_NAME with ArgoCD..."
   argocd app sync $ARGOCD_APP_NAME || log "INFO: ArgoCD synchronization skipped as application is up to date."
 
   log "INFO: ArgoCD synchronization complete."
 }
+
 
 # Main script execution
 main() {

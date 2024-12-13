@@ -1,0 +1,16 @@
+---
+- name: Sync ArgoCD with Kubernetes applications and helm charts
+  hosts: kube_servers
+  become: yes
+  tasks:
+    - name: Copy database deployment script to Kubernetes server
+      copy:
+        src: ../scripts/sync-helm-to-git.sh
+        dest: /home/sen/cloudinator/sync-helm-to-git.sh
+        mode: '0755'
+
+    - name: Execute the database deployment script
+      command: >
+        bash /home/sen/cloudinator/sync-helm-to-git.sh
+        {{ CHART_NAME }} 
+        {{ CHART_VERSION }} 

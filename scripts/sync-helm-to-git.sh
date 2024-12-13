@@ -1,78 +1,241 @@
 #!/bin/bash
 
-# Set variables
+set -euo pipefail
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: $0 <CHART_NAME> <CHART_VERSION>"
+  exit 1
+fi
+
+# Assign input parameters
+CHART_NAME="$1"
+CHART_VERSION="$2"
+
+# Other variables
 REPO_NAME="helm-store"
 REPO_URL="https://nex.psa-khmer.world/repository/helm-store/"
 USERNAME="admin"
 PASSWORD="admin"
-CHART_NAME="cloudinator-app"
-CHART_VERSION="134"
 CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"
 GITLAB_API_URL="https://git.shinoshike.studio/api/v4/projects"
-GITLAB_TOKEN="glpat-xBEAzy-73hWdWatMxCqd"
-PROJECT_NAME="this is my name"
+GITLAB_TOKEN=${GITLAB_TOKEN:-"glpat-xBEAzy-73hWdWatMxCqd"}
 NAMESPACE_ID=44
 VISIBILITY="public"
+ARGOCD_SERVER="argocd.soben.me"
+ARGOCD_APP_NAME="${CHART_NAME}"
+ARGOCD_USERNAME="admin"
+ARGOCD_PASSWORD=${ARGOCD_PASSWORD:-"2eo10JZVXDr5CVba"}
 
-# Add the Nexus Helm repository
-echo "Adding Helm repository: $REPO_NAME"
-helm repo add $REPO_NAME $REPO_URL --username $USERNAME --password $PASSWORD
+# Logging function
+log() {
+  echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+}
 
-# Update Helm repositories
-echo "Updating Helm repositories..."
-helm repo update
+# Install tools
+install_tools() {
+  log "INFO: Checking if required tools are installed..."
 
-# Pull the specified Helm chart
-echo "Pulling Helm chart: $CHART_NAME, version: $CHART_VERSION"
-helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
+  local tools=("jq" "helm" "argocd" "kubectl")
 
-# Extract the Helm chart
-echo "Extracting Helm chart..."
-tar -zxvf $CHART_FILE
+  for tool in "${tools[@]}"; do
+    if ! command -v $tool &>/dev/null; then
+      log "INFO: Installing $tool..."
+      if command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y $tool
+      elif command -v yum &>/dev/null; then
+        sudo yum install -y $tool
+      else
+        log "ERROR: Unsupported package manager. Please install $tool manually." >&2
+        exit 1
+      fi
+    fi
+  done
 
-# Remove the .tgz file after extraction
-echo "Removing the .tgz file: $CHART_FILE"
-rm -f $CHART_FILE
+  log "INFO: All required tools are installed."
+}
 
-# Change directory to the extracted chart
-cd ${CHART_NAME}-${CHART_VERSION}
+# Add Helm repository and update
+add_helm_repo() {
+  log "INFO: Adding Helm repository: $REPO_NAME"
+  if helm repo list | grep -q "$REPO_NAME"; then
+    log "INFO: Repository $REPO_NAME already exists. Updating instead."
+    helm repo update
+    if [[ $? -ne 0 ]]; then
+      log "ERROR: Failed to update Helm repository." >&2
+      exit 1
+    fi
+  else
+    helm repo add $REPO_NAME $REPO_URL --username $USERNAME --password $PASSWORD
+    if [[ $? -ne 0 ]]; then
+      log "ERROR: Failed to add Helm repository." >&2
+      exit 1
+    fi
+  fi
+  log "INFO: Helm repositories updated successfully."
+}
 
-# List the contents of the extracted chart
-echo "Listing contents of the extracted chart directory:"
-ll
+# Pull and extract Helm chart
+pull_and_extract_chart() {
+  log "INFO: Pulling Helm chart: $CHART_NAME, version: $CHART_VERSION"
 
-# Create a project in GitLab using the API
-echo "Creating a project in GitLab..."
-REPO_RESPONSE=$(curl --silent --request POST \
-  --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
-  --data "name=$PROJECT_NAME&namespace_id=$NAMESPACE_ID&visibility=$VISIBILITY" \
-  "$GITLAB_API_URL")
+  # Pull the Helm chart archive if it doesn't exist
+  if [ ! -f "$CHART_FILE" ]; then
+    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
+  else
+    log "INFO: Helm chart archive $CHART_FILE already exists. Overriding with new version."
+    helm pull $REPO_NAME/$CHART_NAME --version $CHART_VERSION
+  fi
 
-# Extract the GitLab repository URL from the response
-REPO_URL=$(echo $REPO_RESPONSE | jq -r '.ssh_url_to_repo')
-if [ "$REPO_URL" == "null" ]; then
-  echo "Failed to create GitLab project. Response: $REPO_RESPONSE"
-  exit 1
+  log "INFO: Extracting Helm chart..."
+
+  # Check if the directory exists
+  if [ -d "$CHART_NAME" ]; then
+    log "INFO: Directory $CHART_NAME already exists. Removing specific files and folders."
+
+    # Remove specific files and directories
+    rm -f "$CHART_NAME/.helmignore" "$CHART_NAME/Chart.yaml" "$CHART_NAME/values.yaml"
+    rm -rf "$CHART_NAME/templates"
+
+    # Extract chart files
+    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1
+  else
+    mkdir "$CHART_NAME"
+    tar -zxvf $CHART_FILE -C "$CHART_NAME" --strip-components=1
+  fi
+
+  # Clean up the Helm chart archive
+  log "INFO: Cleaning up Helm chart archive: $CHART_FILE"
+  rm -f $CHART_FILE
+
+  log "INFO: Helm chart pull and extraction completed."
+}
+
+
+
+# Check if GitLab repository exists
+check_gitlab_repo() {
+  log "INFO: Checking if GitLab repository for $CHART_NAME exists..."
+
+  RESPONSE=$(curl -s -X GET "$GITLAB_API_URL?search=$CHART_NAME" \
+    -H "Authorization: Bearer $GITLAB_TOKEN")
+
+  if ! echo "$RESPONSE" | jq empty &>/dev/null; then
+    log "ERROR: Invalid response from GitLab API. Response: $RESPONSE" >&2
+    exit 1
+  fi
+
+  SSH_REPO=$(echo "$RESPONSE" | jq -r '.[] | select(.name == "'$CHART_NAME'") | .ssh_url_to_repo // empty')
+  if [[ -n "$SSH_REPO" ]]; then
+    log "INFO: GitLab repository already exists: $SSH_REPO"
+  else
+    log "INFO: GitLab repository does not exist. Attempting to create it..."
+    create_gitlab_repo
+  fi
+}
+
+# Create GitLab repository
+create_gitlab_repo() {
+  log "INFO: Creating GitLab repository for $CHART_NAME..."
+  RESPONSE=$(curl -s -X POST "$GITLAB_API_URL" \
+    -H "Authorization: Bearer $GITLAB_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "'$CHART_NAME'",
+      "namespace_id": '$NAMESPACE_ID',
+      "visibility": "'$VISIBILITY'"
+    }')
+
+  SSH_REPO=$(echo "$RESPONSE" | jq -r '.ssh_url_to_repo')
+  if [[ "$SSH_REPO" == "null" ]]; then
+    ERROR_MSG=$(echo "$RESPONSE" | jq -r '.message // "Unknown error"')
+    if [[ "$ERROR_MSG" == *"has already been taken"* ]]; then
+      log "INFO: Repository already exists. Skipping creation."
+    else
+      log "ERROR: Failed to create GitLab repository: $ERROR_MSG" >&2
+      exit 1
+    fi
+  fi
+
+  log "INFO: GitLab repository created successfully: $SSH_REPO"
+}
+
+# Push chart to GitLab repository
+push_to_gitlab() {
+  log "INFO: Pushing Helm chart to GitLab repository..."
+  cd "$CHART_NAME"
+
+  if [ -d .git ]; then
+  log "INFO: .git directory exists. Adding and pushing changes."
+  git add .
+  git commit -m "Update Helm chart"
+  git push
+else
+  log "INFO: .git directory missing or corrupted. Reinitializing repository."
+  git init
+  git branch -M main
+  git remote add origin "$SSH_REPO"
+  git add .
+  git commit -m "Initial commit"
+  git push -u origin main
 fi
-echo "GitLab repository created: $REPO_URL"
 
-# Initialize a Git repository
-echo "Initializing Git repository..."
-git init
 
-# Add a remote pointing to the GitLab repository
-echo "Adding remote Git repository..."
-git remote add origin $REPO_URL
+  log "INFO: Helm chart pushed successfully."
+  cd ..
+}
 
-# Create a `main` branch and make the initial commit
-echo "Setting up main branch and making the initial commit..."
-git branch -M main
-git add .
-git commit -m "Initial commit"
 
-# Push the code to the newly created GitLab repository
-echo "Pushing code to the remote repository..."
-git push -u origin main
+# Create ArgoCD application
+create_argocd_app() {
 
-# End of script
-echo "Helm chart $CHART_NAME version $CHART_VERSION has been pulled, extracted, added to Git, and pushed to $REPO_URL successfully."
+  log "INFO: Creating ArgoCD application $ARGOCD_APP_NAME..."
+cat <<EOF | kubectl apply -f -
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: $ARGOCD_APP_NAME-argocd
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://git.shinoshike.studio/argocd/$ARGOCD_APP_NAME.git
+    targetRevision: main
+    path: ./ # Adjust if the manifests are located in a subdirectory
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+EOF
+
+  log "INFO: ArgoCD application $ARGOCD_APP_NAME created successfully."
+}
+
+# Synchronize with ArgoCD
+sync_with_argocd() {
+  log "INFO: Logging in to ArgoCD..."
+  argocd login $ARGOCD_SERVER --username $ARGOCD_USERNAME --password $ARGOCD_PASSWORD --insecure --grpc-web
+
+  log "INFO: Synchronizing application $ARGOCD_APP_NAME with ArgoCD..."
+  argocd app sync $ARGOCD_APP_NAME || log "INFO: ArgoCD synchronization skipped as application is up to date."
+
+  log "INFO: ArgoCD synchronization complete."
+}
+
+# Main script execution
+main() {
+  install_tools
+  add_helm_repo
+  pull_and_extract_chart
+  check_gitlab_repo
+  push_to_gitlab
+  create_argocd_app
+  sync_with_argocd
+  log "INFO: Script completed successfully."
+}
+
+main

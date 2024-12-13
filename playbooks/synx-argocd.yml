@@ -11,7 +11,6 @@
 
     - name: Sync helm chart to git
       become: true
-      become_uers: sen
       command: sh /home/sen/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }} 
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin"

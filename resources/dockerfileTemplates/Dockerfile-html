@@ -1,4 +1,18 @@
-# Dockerfile for HTML project
-FROM nginx:alpine
-COPY . /usr/share/nginx/html
+# Use the lightweight Nginx image
+FROM nginx:stable-alpine
+
+# Copy only necessary files to the image
+COPY ./ /usr/share/nginx/html
+
+# Ensure proper file permissions
+RUN chmod -R 755 /usr/share/nginx/html
+
+# Expose the default HTTP port
 EXPOSE 80
+
+# Use a health check to monitor container health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
+# Set the default command
+CMD ["nginx", "-g", "daemon off;"]

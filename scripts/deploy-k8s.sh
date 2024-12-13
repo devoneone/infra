@@ -24,23 +24,7 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 # Wait for cert-manager to be ready
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=120s
 
-# Create ClusterIssuer for Let's Encrypt
-cat <<EOF | kubectl apply -f -
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: ${EMAIL}
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-EOF
+
 
 # Prepare directory for manifest files
 mkdir -p /home/sen/cloudinator/${FILE_Path}
@@ -96,7 +80,7 @@ metadata:
   namespace: ${NAMESPACE}
   annotations:
     kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-dns"
 spec:
   tls:
   - hosts:

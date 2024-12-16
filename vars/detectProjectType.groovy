@@ -45,8 +45,22 @@ def detectProjectType(String projectPath) {
             echo "Next.js project detected, setting port to 3000"
             return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
-            echo "React project detected, setting port to 3000"
-            return [type: 'react', port: 3000]
+            if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {
+                echo "React Vite project detected, setting port to 3000"
+                return [type: 'react-vite', port: 3000]
+            } else {
+                echo "React project detected, setting port to 3000"
+                return [type: 'react', port: 3000]
+            }
+        } else if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {
+            echo "Vite project detected, checking further for Next.js or React"
+            if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
+                echo "Next.js Vite project detected, setting port to 3000"
+                return [type: 'nextjs-vite', port: 3000]
+            } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
+                echo "React Vite project detected, setting port to 3000"
+                return [type: 'react-vite', port: 3000]
+            }
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"
             return [type: 'vuejs', port: 8080]

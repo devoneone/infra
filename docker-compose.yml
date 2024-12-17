@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  eureka-service:
+    image: sovanra/eureka:1
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    networks:
+      - spring-cloud-network
+  
+  config-server:
+    image: sovanra/config-server:2
+    ports:
+      - "9090:9090"
+    environment:
+      - SPRING_PROFILES_ACTIVE=git,vault
+    networks:
+      - spring-cloud-network
+
+  identity:
+    image: sovanra/identity:10
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
+    depends_on:
+      - eureka-service
+    networks:
+      - spring-cloud-network
+  project-service:
+    image: sovanra/project-service:1
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
+  infrastructure-service:
+    image: sovanra/infra-service:1
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
+
+  webapp-bff:
+    image: sovanra/nextjs:2
+    ports:
+      - "3000:3000"
+    networks:
+      - spring-cloud-network
+  gateway:
+    image: sovanra/gateway:11
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
+    depends_on:
+      - eureka-service
+    networks:
+      - spring-cloud-network
+
+networks:
+  spring-cloud-network:
+    driver: bridge

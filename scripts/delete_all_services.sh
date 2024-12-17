@@ -12,7 +12,8 @@ NAMESPACE=$1
 
 # Delete all services without confirmation
 echo "Deleting all services in namespace: $NAMESPACE..."
-kubectl delete namespace $NAMESPACE 
+
+kubectl scale --replicas=0 deployment --all -n $NAMESPACE 
 
 # Verify deletion
 echo "Listing remaining services in namespace: $NAMESPACE..."

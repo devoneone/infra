@@ -10,6 +10,6 @@
         dest: /home/sen/cloudinator/delete_all_services.sh
         mode: '0755'
 
-    - name: Execute the shell script to delete all services
+    - name: Execute the shell script to scale deployments and delete all services
       command: >
-        bash /home/sen/cloudinator/delete_all_services.sh {{ NAMESPACE }}
+        bash /home/sen/cloudinator/delete_all_services.sh {{ NAMESPACE }} {{ REPLICA_COUNT }}

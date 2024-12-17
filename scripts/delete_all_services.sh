@@ -27,9 +27,6 @@ kubectl scale --replicas=$REPLICA_COUNT deployment --all -n $NAMESPACE
 echo "Listing deployments in namespace: $NAMESPACE..."
 kubectl get deployments -n $NAMESPACE
 
-# Delete all services without confirmation
-echo "Deleting all services in namespace: $NAMESPACE..."
-kubectl delete services --all -n $NAMESPACE
 
 # Verify deletion
 echo "Listing remaining services in namespace: $NAMESPACE..."

@@ -12,7 +12,7 @@ NAMESPACE=$1
 
 # Delete all services without confirmation
 echo "Deleting all services in namespace: $NAMESPACE..."
-kubectl delete services --all -n $NAMESPACE --ignore-not-found
+kubectl delete namespace $NAMESPACE --ignore-not-found
 
 # Verify deletion
 echo "Listing remaining services in namespace: $NAMESPACE..."

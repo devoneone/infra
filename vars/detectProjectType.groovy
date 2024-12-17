@@ -67,34 +67,19 @@ def detectProjectType(String projectPath) {
         } else if (packageJson.dependencies?.angular || packageJson.devDependencies?.angular) {
             echo "Angular project detected, setting port to 4200"
             return [type: 'angular', port: 4200]
-        } else if (packageJson.dependencies?.gatsby || packageJson.devDependencies?.gatsby) {
-            echo "Gatsby project detected, setting port to 8000"
-            return [type: 'gatsby', port: 8000]
         } else if (packageJson.dependencies?.nuxt || packageJson.devDependencies?.nuxt) {
             echo "Nuxt.js project detected, setting port to 3000"
             return [type: 'nuxtjs', port: 3000]
         } else if (packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte) {
             echo "Svelte project detected, setting port to 5000"
             return [type: 'svelte', port: 5000]
-        } else if (packageJson.dependencies?.sapper || packageJson.devDependencies?.sapper) {
-            echo "Sapper project detected, setting port to 3000"
-            return [type: 'sapper', port: 3000]
         } else if (packageJson.dependencies?.express || packageJson.devDependencies?.express) {
             echo "Express project detected, setting port to 3000"
             return [type: 'express', port: 3000]
         } else if (packageJson.dependencies?.nestjs || packageJson.devDependencies?.nestjs) {
             echo "NestJS project detected, setting port to 3000"
             return [type: 'nestjs', port: 3000]
-        } else if (packageJson.dependencies?.koa || packageJson.devDependencies?.koa) {
-            echo "Koa project detected, setting port to 3000"
-            return [type: 'koa', port: 3000]
-        } else if (packageJson.dependencies?.hapi || packageJson.devDependencies?.hapi) {
-            echo "Hapi project detected, setting port to 3000"
-            return [type: 'hapi', port: 3000]
-        } else if (packageJson.dependencies?.fastify || packageJson.devDependencies?.fastify) {
-            echo "Fastify project detected, setting port to 3000"
-            return [type: 'fastify', port: 3000]
-        } 
+        }
     }else if (fileExists("${projectPath}/index.html")) {
         echo "HTML project detected"
         return [type: 'html']

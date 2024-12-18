@@ -113,7 +113,7 @@ def detectProjectType(String projectPath = '.') {
         }
     }else if (fileExists("${projectPath}/index.html")) {
         echo "HTML project detected"
-        return [type: 'html']
+        return [type: 'html', port: 80]
     } else if (fileExists("${projectPath}/index.php")) {
         echo "PHP project detected"
         return [type: 'php']

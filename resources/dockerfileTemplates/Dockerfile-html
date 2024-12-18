@@ -1,18 +1,14 @@
-# Use the lightweight Nginx image
-FROM nginx:stable-alpine
+# Use the official Nginx image as the base image
+FROM nginx:alpine
 
-# Copy only necessary files to the image
-COPY . /usr/share/nginx/html
+# Set the working directory inside the container
+WORKDIR /usr/share/nginx/html
 
-# Ensure proper file permissions
-RUN chmod -R 755 /usr/share/nginx/html
+# Copy your HTML files and other assets into the Nginx HTML folder
+COPY . .
 
-# Expose the default HTTP port
+# Expose port 80 to the host
 EXPOSE 80
 
-# Use a health check to monitor container health
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
-
-# Set the default command
+# Command to start Nginx
 CMD ["nginx", "-g", "daemon off;"]

@@ -208,7 +208,7 @@ spec:
     path: ./ # Adjust if the manifests are located in a subdirectory
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: $CHART_NAME
   syncPolicy:
     automated:
       prune: true

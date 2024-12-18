@@ -47,7 +47,7 @@ def detectProjectType(String projectPath) {
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
             if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {
                 echo "React Vite project detected, setting port to 3000"
-                return [type: 'react-vite', port: 3000]
+                return [type: 'vite-react', port: 3000]
             } else {
                 echo "React project detected, setting port to 3000"
                 return [type: 'react', port: 3000]

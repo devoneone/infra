@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   eureka-service:
-    image: sovanra/eureka-service:1
+    image: sovanra/eureka:1
     ports:
       - "8761:8761"
     environment:
@@ -20,7 +20,7 @@ services:
       - spring-cloud-network
 
   identity:
-    image: sovanra/identity-server:1.1
+    image: sovanra/identity:10
     ports:
       - "8080:8080"
     environment:
@@ -31,14 +31,14 @@ services:
     networks:
       - spring-cloud-network
   project-service:
-    image: sovanra/project-server:1.2
+    image: sovanra/project-service:2
     ports:
       - "8087:8087"
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
   gateway:
-    image: sovanra/gateway-server:1
+    image: muyleangin/gateway:1.1
     ports:
       - "8081:8081"
     environment:
@@ -46,7 +46,6 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-service:8761/eureka/
     depends_on:
       - eureka-service
-      - config-server
     networks:
       - spring-cloud-network
   webapp-bff:

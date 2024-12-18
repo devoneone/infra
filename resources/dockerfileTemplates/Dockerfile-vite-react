@@ -1,40 +1,30 @@
-# Stage 1: Builder
-FROM node:18-alpine AS builder
+# Use the official Node.js image as the base image
+FROM node:18
 
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json first to leverage Docker caching
-COPY package.json package-lock.json ./
+# Copy the package.json and package-lock.json files
+COPY package*.json ./
 
-# Install dependencies using npm ci
-RUN npm ci
+# Install dependencies
+RUN npm install
 
-# Copy the rest of the application and build it
+# Copy the rest of the application code
 COPY . .
+
+# Build the Vite project
 RUN npm run build
 
-# Stage 2: Runner
-FROM node:18-alpine
+# Use a lightweight web server to serve the static files
+# Use the official NGINX image
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy the build output from the previous stage to the NGINX html directory
+COPY --from=0 /app/dist /usr/share/nginx/html
 
-# Install serve for serving the built app
-RUN npm install -g serve
+# Expose port 80
+EXPOSE 80
 
-# Create a non-root user to run the app securely
-RUN addgroup -S app && adduser -S -G app app
-
-# Copy only the necessary files for production
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/dist ./dist
-
-# Change ownership to the non-root user
-RUN chown -R app:app /app
-
-# Switch to the non-root user
-USER app
-
-EXPOSE 5173
-
-# Serve the app on port 5173
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Start NGINX server
+CMD ["nginx", "-g", "daemon off;"]

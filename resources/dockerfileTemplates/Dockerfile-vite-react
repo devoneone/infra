@@ -1,42 +1,43 @@
-# Use an official Node.js runtime as a parent image
+# Stage 1: Building the application
 FROM node:18-alpine AS builder
 
-RUN apk add --no-cache libc6-compat
-
-# Set the working directory to /app
 WORKDIR /app
 
-# Copy the package.json and package-lock.json files to the container
-COPY package.json package-lock.json ./
+# Copy package files
+COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
-# Copy all other project files to working directory
+# Copy all other source code files
 COPY . .
 
-# Build the project using Vite
+# Build the application
 RUN npm run build
 
-# Multi-stage build process
-FROM node:18-alpine
+# Stage 2: Serve the application
+FROM nginx:alpine
 
-# update and install latest dependencies, add dumb-init package
-# add a non-root user
-RUN apk update && apk upgrade && apk add dumb-init && adduser -D nextuser
+# Add non-root user
+RUN adduser -D -u 1001 appuser && \
+    chown -R appuser:appuser /usr/share/nginx/html && \
+    chown -R appuser:appuser /var/cache/nginx && \
+    chown -R appuser:appuser /var/log/nginx && \
+    chown -R appuser:appuser /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R appuser:appuser /var/run/nginx.pid
 
-# Set work dir as app
-WORKDIR /app
+# Copy custom Nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy the build output from the builder stage
-COPY --from=builder /app/dist ./
+# Copy the built assets from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Set non-root user
-USER nextuser
+# Switch to non-root user
+USER 1001
 
-EXPOSE 3000
+# Expose port 5173
+EXPOSE 5173
 
-ENV HOST=0.0.0.0 PORT=3000 NODE_ENV=production
-
-# Start the application
-CMD ["dumb-init","node","server.js"]
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]

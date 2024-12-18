@@ -51,8 +51,7 @@ def detectProjectType(String projectPath) {
             } else {
                 echo "React project detected, setting port to 3000"
                 return [type: 'react', port: 3000]
-            }
-        } 
+            } 
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"
             return [type: 'vuejs', port: 8080]
@@ -114,7 +113,7 @@ def writeDockerfile(String projectType, String projectPath, String packageManage
         def dockerfileContent = libraryResource "dockerfileTemplates/Dockerfile-${projectType}"
         dockerfileContent = dockerfileContent.replaceAll("\\{\\{packageManager\\}\\}", packageManager)
         writeFile file: "${projectPath}/Dockerfile", text: dockerfileContent
-        echo "Dockerfile successfully written for ${projectType} project at ${projectPath}/Dockerfile"
+        echo "2written for ${projectType} project at ${projectPath}/Dockerfile"
     } catch (Exception e) {
         error "Failed to write Dockerfile for ${projectType} project: ${e.message}"
     }

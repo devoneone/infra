@@ -3,9 +3,13 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Copy package.json and package-lock.json first to leverage Docker caching
 COPY package.json package-lock.json ./
+
+# Install dependencies using npm ci
 RUN npm ci
 
+# Copy the rest of the application and build it
 COPY . .
 RUN npm run build
 
@@ -14,14 +18,23 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy necessary files
+# Install serve for serving the built app
+RUN npm install -g serve
+
+# Create a non-root user to run the app securely
+RUN addgroup -S app && adduser -S -G app app
+
+# Copy only the necessary files for production
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+
+# Change ownership to the non-root user
+RUN chown -R app:app /app
+
+# Switch to the non-root user
+USER app
 
 EXPOSE 5173
 
-ENV HOST=0.0.0.0
-ENV PORT=5173
-
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173","server.js"]
+# Serve the app on port 5173
+CMD ["serve", "-s", "dist", "-l", "5173"]

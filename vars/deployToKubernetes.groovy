@@ -94,7 +94,7 @@ def detectProjectType(String projectPath = '.') {
             }
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"
-            return [type: 'vuejs', port: 8080]
+            return [type: 'vuejs', port: 80]
         } else if (packageJson.dependencies?.angular || packageJson.devDependencies?.angular) {
             echo "Angular project detected, setting port to 4200"
             return [type: 'angular', port: 4200]

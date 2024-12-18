@@ -46,8 +46,8 @@ def detectProjectType(String projectPath) {
             return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
             if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {
-                echo "React Vite project detected, setting port to 3000"
-                return [type: 'vite-react', port: 3000]
+                echo "React Vite project detected, setting port to 5173"
+                return [type: 'vite-react', port: 5173]
             } else {
                 echo "React project detected, setting port to 3000"
                 return [type: 'react', port: 3000]

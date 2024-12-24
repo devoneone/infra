@@ -1,48 +1,72 @@
-# Use an official Node.js runtime as a parent image
-FROM node:18-alpine AS builder
-
-RUN apk add --no-cache libc6-compat
-
-# Set the working directory to /app
-WORKDIR /app
-
-# Copy the package.json and package-lock.json files to the container
-COPY package.json package-lock.json ./
-
-# Copy all other project files to working directory
-COPY . .
-
-RUN npm install -g {{packageManager}} 
-# if use Image
-RUN {{packageManager}} i sharp
-
-# Run the next build process and generate the artifacts
-RUN {{packageManager}} run build
-
-# Multi-stage build process
+# Use base Node version
 FROM node:18-alpine
 
-# update and install latest dependencies, add dumb-init package
-# add a non-root user
-RUN apk update && apk upgrade && apk add dumb-init && adduser -D nextuser
-
-# Set work dir as app
+# Set working directory
 WORKDIR /app
 
-# Copy the public folder from the project as this is not included in the build process
-COPY --chown=nextuser:nextuser --from=builder /app/public ./public
+# Copy package files
+COPY package*.json ./
 
-# Copy the standalone folder inside the .next folder generated from the build process
-COPY --chown=nextuser:nextuser --from=builder /app/.next/standalone ./
+# Version detection and setup for ALL Next.js versions
+RUN NEXT_VERSION=$(node -p "require('./package.json').dependencies.next || require('./package.json').devDependencies.next") && \
+    NEXT_MAJOR=$(echo $NEXT_VERSION | sed "s/[^0-9]*\([0-9]*\).*/\1/") && \
+    echo "🔍 Detected Next.js version: $NEXT_VERSION (Major: $NEXT_MAJOR)" && \
+    case $NEXT_MAJOR in \
+        9) \
+            echo "⚙️ Setting up for Next.js 9" && \
+            apk add --no-cache python2 make g++ && \
+            export NODE_OPTIONS="--openssl-legacy-provider";; \
+        10) \
+            echo "⚙️ Setting up for Next.js 10" && \
+            export NODE_OPTIONS="--openssl-legacy-provider";; \
+        11) \
+            echo "⚙️ Setting up for Next.js 11" && \
+            export NODE_OPTIONS="--openssl-legacy-provider";; \
+        12) \
+            echo "⚙️ Setting up for Next.js 12" && \
+            export NODE_OPTIONS="--openssl-legacy-provider";; \
+        13) \
+            echo "⚙️ Setting up for Next.js 13";; \
+        14) \
+            echo "⚙️ Setting up for Next.js 14";; \
+        15) \
+            echo "⚙️ Setting up for Next.js 15";; \
+        *) \
+            echo "⚙️ Setting up for Next.js $NEXT_MAJOR";; \
+    esac && \
+    if [ "$NEXT_MAJOR" -le 12 ]; then \
+        echo "📦 Installing dependencies for legacy version..." && \
+        npm install --legacy-peer-deps --force; \
+    else \
+        echo "📦 Installing dependencies..." && \
+        npm install --force; \
+    fi
 
-# Copy the static folder inside the .next folder generated from the build process
-COPY --chown=nextuser:nextuser --from=builder /app/.next/static ./.next/static
-# Set non-root user
-USER nextuser
+# Copy rest of the application
+COPY . .
 
+# Build with version-specific settings
+RUN NEXT_VERSION=$(node -p "require('./package.json').dependencies.next || require('./package.json').devDependencies.next") && \
+    NEXT_MAJOR=$(echo $NEXT_VERSION | sed "s/[^0-9]*\([0-9]*\).*/\1/") && \
+    if [ "$NEXT_MAJOR" -le 12 ]; then \
+        export NODE_OPTIONS="--openssl-legacy-provider"; \
+    fi && \
+    echo "🏗️ Building Next.js $NEXT_VERSION" && \
+    npm run build
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Set legacy SSL for older versions at runtime
+RUN NEXT_VERSION=$(node -p "require('./package.json').dependencies.next || require('./package.json').devDependencies.next") && \
+    NEXT_MAJOR=$(echo $NEXT_VERSION | sed "s/[^0-9]*\([0-9]*\).*/\1/") && \
+    if [ "$NEXT_MAJOR" -le 12 ]; then \
+        echo "export NODE_OPTIONS='--openssl-legacy-provider'" >> /etc/profile.d/next.sh; \
+    fi
+
+# Expose port
 EXPOSE 3000
 
-ENV HOST=0.0.0.0 PORT=3000 NODE_ENV=production
-
-# Start the application
-CMD ["dumb-init","node","server.js"]
+# Start command
+CMD ["npm", "start"]

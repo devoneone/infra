@@ -42,14 +42,14 @@ def detectProjectType(String projectPath) {
         echo "package.json contents: ${packageJson}"
 
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
-            echo "Next.js dependencies found - starting standalone mode configuration"
-            try {
-                writeNextEnsureStandaloneMode(projectPath)
-                echo "Standalone mode configuration completed successfully"
-            } catch (Exception e) {
-                echo "Error during standalone mode configuration: ${e.message}"
-                // Continue execution even if configuration fails
-            }
+            // echo "Next.js dependencies found - starting standalone mode configuration"
+            // try {
+            //     writeNextEnsureStandaloneMode(projectPath)
+            //     echo "Standalone mode configuration completed successfully"
+            // } catch (Exception e) {
+            //     echo "Error during standalone mode configuration: ${e.message}"
+            //     // Continue execution even if configuration fails
+            // }
             echo "Next.js project detected, setting port to 3000"
             return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {

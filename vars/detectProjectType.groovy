@@ -123,9 +123,18 @@ def writeDockerfile(String projectType, String projectPath, String packageManage
 
 def writeNextEnsureStandaloneMode(String projectPath) {
     try {
-        def nextConfigContent = libraryResource "scripts/ensure-next-standalone-mode.sh"
-        writeFile file: "${projectPath}/ensure-next-standalone-mode.sh", text: nextConfigContent
-        echo "Next.js ensure standalone mode script written at ${projectPath}/ensure-next-standalone-mode.sh"
+        def scriptContent = libraryResource "scripts/ensure-next-standalone-mode.sh"
+        def scriptPath = "${projectPath}/ensure-next-standalone-mode.sh"
+        writeFile file: scriptPath, text: scriptContent
+        
+        // Make the script executable
+        sh """
+            chmod +x ${scriptPath}
+            cd ${projectPath}
+            ./ensure-next-standalone-mode.sh
+        """
+        
+        echo "Next.js standalone mode configured successfully"
     } catch (Exception e) {
         error "Failed to write Next.js ensure standalone mode script: ${e.message}"
     }

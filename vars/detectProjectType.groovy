@@ -42,8 +42,8 @@ def detectProjectType(String projectPath) {
         echo "package.json contents: ${packageJson}"
 
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
-            echo "Next.js project detected, setting port to 3000"
             writeNextEnsureStandaloneMode(projectPath)
+            echo "Next.js project detected, setting port to 3000"
             return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
             if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {

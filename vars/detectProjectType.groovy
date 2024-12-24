@@ -43,6 +43,7 @@ def detectProjectType(String projectPath) {
 
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
             echo "Next.js project detected, setting port to 3000"
+            writeNextEnsureStandaloneMode(projectPath)
             return [type: 'nextjs', port: 3000]
         } else if (packageJson.dependencies?.react || packageJson.devDependencies?.react) {
             if (packageJson.dependencies?.vite || packageJson.devDependencies?.vite) {
@@ -116,5 +117,16 @@ def writeDockerfile(String projectType, String projectPath, String packageManage
         echo "2written for ${projectType} project at ${projectPath}/Dockerfile"
     } catch (Exception e) {
         error "Failed to write Dockerfile for ${projectType} project: ${e.message}"
+    }
+}
+
+
+def writeNextEnsureStandaloneMode(String projectPath) {
+    try {
+        def nextConfigContent = libraryResource "scripts/ensure-next-standalone-mode.sh"
+        writeFile file: "${projectPath}/ensure-next-standalone-mode.sh", text: nextConfigContent
+        echo "Next.js ensure standalone mode script written at ${projectPath}/ensure-next-standalone-mode.sh"
+    } catch (Exception e) {
+        error "Failed to write Next.js ensure standalone mode script: ${e.message}"
     }
 }

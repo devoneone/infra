@@ -126,6 +126,7 @@ def writeNextEnsureStandaloneMode(String projectPath) {
         def scriptContent = libraryResource "scripts/ensure-next-standalone-mode.sh"
         def scriptPath = "${projectPath}/ensure-next-standalone-mode.sh"
         writeFile file: scriptPath, text: scriptContent
+        echo "Script written for Next.js standalone mode at ${scriptPath}"
         
         // Make the script executable
         sh """

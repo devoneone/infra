@@ -21,13 +21,6 @@ configure_database() {
             DB_PORT=5432
             VOLUME_MOUNT_PATH="/var/lib/postgresql/data"
             HEALTHCHECK_CMD='["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]'
-            RESOURCE_REQUEST_CPU="100m"
-            RESOURCE_REQUEST_MEM="128Mi"
-            RESOURCE_LIMIT_CPU="200m"
-            RESOURCE_LIMIT_MEM="256Mi"
-            RUN_AS_USER=999
-            RUN_AS_GROUP=999
-            FS_GROUP=999
             ;;
         "mysql")
             DB_IMAGE="mysql:${DB_VERSION}"
@@ -37,13 +30,6 @@ configure_database() {
             DB_PORT=3306
             VOLUME_MOUNT_PATH="/var/lib/mysql"
             HEALTHCHECK_CMD='["CMD", "mysqladmin", "ping", "-h", "localhost"]'
-            RESOURCE_REQUEST_CPU="200m"
-            RESOURCE_REQUEST_MEM="256Mi"
-            RESOURCE_LIMIT_CPU="400m"
-            RESOURCE_LIMIT_MEM="512Mi"
-            RUN_AS_USER=999
-            RUN_AS_GROUP=999
-            FS_GROUP=999
             ;;
         "mongodb")
             DB_IMAGE="mongo:${DB_VERSION}"
@@ -53,152 +39,160 @@ configure_database() {
             DB_PORT=27017
             VOLUME_MOUNT_PATH="/data/db"
             HEALTHCHECK_CMD='["CMD", "mongosh", "--eval", "db.adminCommand(\"ping\")"]'
-            RESOURCE_REQUEST_CPU="200m"
-            RESOURCE_REQUEST_MEM="256Mi"
-            RESOURCE_LIMIT_CPU="400m"
-            RESOURCE_LIMIT_MEM="512Mi"
-            RUN_AS_USER=999
-            RUN_AS_GROUP=999
-            FS_GROUP=999
             ;;
         *)
-            echo "Unsupported database type. Use postgres, mysql, or mongodb."
+            echo "❌ Unsupported database type. Use postgres, mysql, or mongodb."
             exit 1
             ;;
     esac
 }
 
-# Create StorageClass
+# Create the StorageClass
 create_storage_class() {
-    cat <<EOF | kubectl apply -f -
+    if ! kubectl get storageclass local-storage &>/dev/null; then
+        echo "Creating StorageClass 'local-storage'..."
+        cat <<EOF | kubectl apply -f -
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ${DB_NAME}-storage
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
+  name: local-storage
 provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
 reclaimPolicy: Retain
 EOF
+    else
+        echo "StorageClass 'local-storage' already exists."
+    fi
 }
 
-# Create PV with updated permissions
-create_persistent_volume() {
+# Create the NetworkPolicy
+create_network_policy() {
     cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: PersistentVolume
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-  name: ${DB_NAME}-pv
+  name: ${DB_NAME}-network-policy
   namespace: ${NAMESPACE}
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
 spec:
-  capacity:
-    storage: ${STORAGE_SIZE}
-  accessModes:
-    - ReadWriteOnce
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: ${DB_NAME}-storage
-  hostPath:
-    path: /data/${NAMESPACE}/${DB_NAME}
-    type: DirectoryOrCreate
-  mountOptions:
-    - uid=${RUN_AS_USER}
-    - gid=${RUN_AS_GROUP}
+  podSelector:
+    matchLabels:
+      app: ${DB_NAME}
+      type: database
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          type: application
+    - podSelector:
+        matchLabels:
+          type: application
+    ports:
+    - protocol: TCP
+      port: ${DB_PORT}
+  policyTypes:
+  - Ingress
 EOF
 }
 
-# Create namespace and optimized resources
+# Create namespace and secret
 create_namespace_resources() {
-    # Create namespace
     kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+    kubectl label namespace ${NAMESPACE} type=application --overwrite
 
-    # Create ResourceQuota with optimized values
-    cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: ${DB_NAME}-quota
-  namespace: ${NAMESPACE}
-spec:
-  hard:
-    requests.cpu: "500m"
-    requests.memory: 512Mi
-    limits.cpu: "1"
-    limits.memory: 1Gi
-    persistentvolumeclaims: "3"
-EOF
-
-    # Create secret
     kubectl create secret generic ${DB_NAME}-secret \
         --from-literal=${ENV_USERNAME_VAR}=${DB_USERNAME} \
         --from-literal=${ENV_PASSWORD_VAR}=${DB_PASSWORD} \
         --from-literal=${ENV_DB_VAR}=${DB_NAME} \
         --namespace=${NAMESPACE} \
         --dry-run=client -o yaml | kubectl apply -f -
+}
 
-    # Create PVC
+# Create PV
+create_persistent_volume() {
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: ${DB_NAME}-pv
+  labels:
+    type: database
+    app: ${DB_NAME}
+spec:
+  capacity:
+    storage: ${STORAGE_SIZE}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  hostPath:
+    path: /data/${NAMESPACE}/${DB_NAME}
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - ${NODE_NAME}
+EOF
+}
+
+# Create PVC
+create_persistent_volume_claim() {
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ${DB_NAME}-pvc
   namespace: ${NAMESPACE}
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
 spec:
-  storageClassName: ${DB_NAME}-storage
+  storageClassName: local-storage
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: ${STORAGE_SIZE}
+  selector:
+    matchLabels:
+      type: database
+      app: ${DB_NAME}
 EOF
 }
 
-# Deploy database StatefulSet with updated security context
-deploy_database() {
+# Create StatefulSet
+create_statefulset() {
     cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: ${DB_NAME}
   namespace: ${NAMESPACE}
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
-    app.kubernetes.io/instance: ${DB_NAME}
-    app.kubernetes.io/version: "${DB_VERSION}"
 spec:
   serviceName: ${DB_NAME}
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: ${DB_NAME}
+      app: ${DB_NAME}
+      type: database
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ${DB_NAME}
-        app.kubernetes.io/component: database
-        app.kubernetes.io/instance: ${DB_NAME}
+        app: ${DB_NAME}
+        type: database
     spec:
       securityContext:
-        fsGroup: ${FS_GROUP}
-        runAsUser: ${RUN_AS_USER}
-        runAsGroup: ${RUN_AS_GROUP}
+        fsGroup: 999
+        runAsUser: 999
+        runAsGroup: 999
       containers:
       - name: ${DB_NAME}
         image: ${DB_IMAGE}
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
-          runAsUser: ${RUN_AS_USER}
-          runAsGroup: ${RUN_AS_GROUP}
+          runAsUser: 999
+          runAsGroup: 999
           capabilities:
             drop: ["ALL"]
         env:
@@ -226,11 +220,11 @@ spec:
           mountPath: ${VOLUME_MOUNT_PATH}
         resources:
           requests:
-            memory: ${RESOURCE_REQUEST_MEM}
-            cpu: ${RESOURCE_REQUEST_CPU}
+            memory: "256Mi"
+            cpu: "200m"
           limits:
-            memory: ${RESOURCE_LIMIT_MEM}
-            cpu: ${RESOURCE_LIMIT_CPU}
+            memory: "512Mi"
+            cpu: "500m"
         startupProbe:
           exec:
             command: ${HEALTHCHECK_CMD}
@@ -246,34 +240,14 @@ spec:
             command: ${HEALTHCHECK_CMD}
           initialDelaySeconds: 30
           periodSeconds: 10
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app.kubernetes.io/name
-                  operator: In
-                  values:
-                  - ${DB_NAME}
-              topologyKey: kubernetes.io/hostname
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-      labels:
-        app.kubernetes.io/name: ${DB_NAME}
-        app.kubernetes.io/component: database
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      storageClassName: ${DB_NAME}-storage
-      resources:
-        requests:
-          storage: ${STORAGE_SIZE}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ${DB_NAME}-pvc
 EOF
 }
 
-# Create service with optimized timeout values
+# Create Service
 create_service() {
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -282,8 +256,8 @@ metadata:
   name: ${DB_NAME}
   namespace: ${NAMESPACE}
   labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
+    app: ${DB_NAME}
+    type: database
 spec:
   type: ClusterIP
   ports:
@@ -292,42 +266,12 @@ spec:
       protocol: TCP
       name: db-port
   selector:
-    app.kubernetes.io/name: ${DB_NAME}
+    app: ${DB_NAME}
+    type: database
 EOF
 }
 
-# Create network policy with specific rules
-create_network_policy() {
-    cat <<EOF | kubectl apply -f -
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: ${DB_NAME}-network-policy
-  namespace: ${NAMESPACE}
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: ${DB_NAME}
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          access: ${DB_NAME}
-    - podSelector:
-        matchLabels:
-          access: ${DB_NAME}
-    ports:
-    - protocol: TCP
-      port: ${DB_PORT}
-  policyTypes:
-  - Ingress
-EOF
-}
-
-# Create Ingress with optimized configurations
+# Create Ingress
 create_ingress() {
     cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
@@ -335,19 +279,13 @@ kind: Ingress
 metadata:
   name: ${DB_NAME}-ingress
   namespace: ${NAMESPACE}
-  labels:
-    app.kubernetes.io/name: ${DB_NAME}
-    app.kubernetes.io/component: database
   annotations:
     kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-dns"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "${DB_TYPE}"
 spec:
-  tls:
-  - hosts:
-    - ${DOMAIN_NAME}
-    secretName: ${DB_NAME}-tls
   rules:
-  - host: ${DOMAIN_NAME}
+  - host: ${DB_NAME}.${DOMAIN_NAME}
     http:
       paths:
       - path: /
@@ -357,51 +295,80 @@ spec:
             name: ${DB_NAME}
             port:
               number: ${DB_PORT}
+  tls:
+  - hosts:
+    - ${DB_NAME}.${DOMAIN_NAME}
+    secretName: ${DB_NAME}-tls
 EOF
 }
 
-# Initialize host directory with correct permissions
+# Initialize host directory
 initialize_host_directory() {
     echo "Creating and setting permissions for host directory..."
     sudo mkdir -p /data/${NAMESPACE}/${DB_NAME}
-    sudo chown -R ${RUN_AS_USER}:${RUN_AS_GROUP} /data/${NAMESPACE}/${DB_NAME}
+    sudo chown -R 999:999 /data/${NAMESPACE}/${DB_NAME}
     sudo chmod -R 700 /data/${NAMESPACE}/${DB_NAME}
 }
 
-# Main execution
+# Main deployment function
 main() {
+    echo "🚀 Starting database deployment..."
+
+    # Get node name for PV node affinity
+    NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+    if [ -z "${NODE_NAME}" ]; then
+        echo "❌ Failed to get node name!"
+        exit 1
+    fi
+
+    echo "⚙️ Configuring database..."
     configure_database
-    initialize_host_directory
+    
+    echo "📂 Creating StorageClass..."
     create_storage_class
-    create_persistent_volume
-    create_namespace_resources
-    deploy_database
-    create_service
+    
+    echo "🔒 Creating NetworkPolicy..."
     create_network_policy
+    
+    echo "📂 Initializing storage..."
+    initialize_host_directory
+    
+    echo "🔑 Creating namespace and secrets..."
+    create_namespace_resources
+    
+    echo "💾 Creating PV..."
+    create_persistent_volume
+    
+    echo "📝 Creating PVC..."
+    create_persistent_volume_claim
+    
+    echo "⏳ Waiting for PVC to bind..."
+    kubectl wait --for=condition=Bound pvc/${DB_NAME}-pvc -n ${NAMESPACE} --timeout=60s
+    
+    echo "🚀 Creating StatefulSet..."
+    create_statefulset
+    
+    echo "🔌 Creating Service..."
+    create_service
+    
+    echo "🌐 Creating Ingress..."
     create_ingress
     
     echo "✅ Database deployment completed successfully!"
+    echo ""
     echo "📊 Database Details:"
     echo "  - Name: ${DB_NAME}"
     echo "  - Type: ${DB_TYPE}"
     echo "  - Version: ${DB_VERSION}"
     echo "  - Namespace: ${NAMESPACE}"
-    echo "  - Domain: ${DOMAIN_NAME}"
     echo "  - Port: ${DB_PORT}"
-    echo "  - CPU Request: ${RESOURCE_REQUEST_CPU}"
-    echo "  - Memory Request: ${RESOURCE_REQUEST_MEM}"
     echo ""
     echo "🔌 Connection Information:"
     echo "  - Internal: ${DB_NAME}.${NAMESPACE}.svc.cluster.local:${DB_PORT}"
-    echo "  - External: ${DOMAIN_NAME}"
+    echo "  - External: ${DB_NAME}.${DOMAIN_NAME}"
     echo ""
     echo "⏳ Wait for the database to be ready:"
-    echo "  kubectl get pods -n ${NAMESPACE} -l app.kubernetes.io/name=${DB_NAME} -w"
-    echo ""
-    echo "💡 Resource Usage Tips:"
-    echo "  - Monitor resource usage with: kubectl top pods -n ${NAMESPACE}"
-    echo "  - Check logs with: kubectl logs -n ${NAMESPACE} ${DB_NAME}-0"
-    echo "  - View details with: kubectl describe pod -n ${NAMESPACE} ${DB_NAME}-0"
+    echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME} -w"
 }
 
 # Execute main function

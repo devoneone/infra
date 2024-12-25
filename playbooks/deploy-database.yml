@@ -13,10 +13,10 @@
       command: >
         bash /home/sen/cloudinator/deploy-database.sh 
         {{ DB_NAME }} 
-        {{ DB_IMAGE }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
         {{ NAMESPACE }} 
         {{ DB_PASSWORD }} 
         {{ DB_USERNAME }} 
         {{ DOMAIN_NAME }} 
-        {{ EMAIL }} 
         {{ STORAGE_SIZE }}

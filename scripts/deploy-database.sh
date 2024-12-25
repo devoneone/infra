@@ -281,8 +281,12 @@ metadata:
   namespace: ${NAMESPACE}
   annotations:
     kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-dns"
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "${DB_TYPE}"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 spec:
   rules:
   - host: ${DOMAIN_NAME}
@@ -297,7 +301,7 @@ spec:
               number: ${DB_PORT}
   tls:
   - hosts:
-    - ${DB_NAME}.${DOMAIN_NAME}
+    - ${DOMAIN_NAME}
     secretName: ${DB_NAME}-tls
 EOF
 }

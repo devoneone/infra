@@ -10,7 +10,6 @@ DB_USERNAME=${6:-defaultUser}
 DOMAIN_NAME=$7
 STORAGE_SIZE=${8:-1Gi}
 
-
 # Function to set database-specific configurations
 configure_database() {
     case ${DB_TYPE} in
@@ -26,6 +25,9 @@ configure_database() {
             RESOURCE_REQUEST_MEM="128Mi"
             RESOURCE_LIMIT_CPU="200m"
             RESOURCE_LIMIT_MEM="256Mi"
+            RUN_AS_USER=999
+            RUN_AS_GROUP=999
+            FS_GROUP=999
             ;;
         "mysql")
             DB_IMAGE="mysql:${DB_VERSION}"
@@ -39,6 +41,9 @@ configure_database() {
             RESOURCE_REQUEST_MEM="256Mi"
             RESOURCE_LIMIT_CPU="400m"
             RESOURCE_LIMIT_MEM="512Mi"
+            RUN_AS_USER=999
+            RUN_AS_GROUP=999
+            FS_GROUP=999
             ;;
         "mongodb")
             DB_IMAGE="mongo:${DB_VERSION}"
@@ -52,6 +57,9 @@ configure_database() {
             RESOURCE_REQUEST_MEM="256Mi"
             RESOURCE_LIMIT_CPU="400m"
             RESOURCE_LIMIT_MEM="512Mi"
+            RUN_AS_USER=999
+            RUN_AS_GROUP=999
+            FS_GROUP=999
             ;;
         *)
             echo "Unsupported database type. Use postgres, mysql, or mongodb."
@@ -77,7 +85,7 @@ reclaimPolicy: Retain
 EOF
 }
 
-# Create PV with smaller default size
+# Create PV with updated permissions
 create_persistent_volume() {
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -98,6 +106,9 @@ spec:
   hostPath:
     path: /data/${NAMESPACE}/${DB_NAME}
     type: DirectoryOrCreate
+  mountOptions:
+    - uid=${RUN_AS_USER}
+    - gid=${RUN_AS_GROUP}
 EOF
 }
 
@@ -150,7 +161,7 @@ spec:
 EOF
 }
 
-# Deploy database StatefulSet with optimized resources
+# Deploy database StatefulSet with updated security context
 deploy_database() {
     cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
@@ -176,12 +187,18 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/instance: ${DB_NAME}
     spec:
+      securityContext:
+        fsGroup: ${FS_GROUP}
+        runAsUser: ${RUN_AS_USER}
+        runAsGroup: ${RUN_AS_GROUP}
       containers:
       - name: ${DB_NAME}
         image: ${DB_IMAGE}
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
+          runAsUser: ${RUN_AS_USER}
+          runAsGroup: ${RUN_AS_GROUP}
           capabilities:
             drop: ["ALL"]
         env:
@@ -229,7 +246,6 @@ spec:
             command: ${HEALTHCHECK_CMD}
           initialDelaySeconds: 30
           periodSeconds: 10
-      # Add anti-affinity to spread pods across nodes
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -344,9 +360,18 @@ spec:
 EOF
 }
 
+# Initialize host directory with correct permissions
+initialize_host_directory() {
+    echo "Creating and setting permissions for host directory..."
+    sudo mkdir -p /data/${NAMESPACE}/${DB_NAME}
+    sudo chown -R ${RUN_AS_USER}:${RUN_AS_GROUP} /data/${NAMESPACE}/${DB_NAME}
+    sudo chmod -R 700 /data/${NAMESPACE}/${DB_NAME}
+}
+
 # Main execution
 main() {
     configure_database
+    initialize_host_directory
     create_storage_class
     create_persistent_volume
     create_namespace_resources

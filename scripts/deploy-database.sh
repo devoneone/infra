@@ -176,11 +176,6 @@ spec:
         app.kubernetes.io/component: database
         app.kubernetes.io/instance: ${DB_NAME}
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
-        fsGroup: 999
-        allowPrivilegeEscalation: false
       containers:
       - name: ${DB_NAME}
         image: ${DB_IMAGE}

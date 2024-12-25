@@ -277,7 +277,7 @@ spec:
   type: ClusterIP
   ports:
     - port: ${DB_PORT}
-      targetPort: db-port
+      targetPort: ${DB_PORT}
       protocol: TCP
       name: db-port
   selector:

@@ -2,15 +2,26 @@ def call() {
     try {
         if (fileExists('package.json')) {
             echo "package.json found. Updating npm dependencies."
-            
-            // Attempt to update dependencies and resolve conflicts with legacy-peer-deps
-            sh 'npm update --save'
-            
-            // Use --legacy-peer-deps to bypass dependency resolution conflicts
-            sh 'npm install --legacy-peer-deps'
-            
-            // Optional: Add a fallback to force install if issues persist
-            echo "If dependency issues persist, use --force to proceed."
+
+            // Attempt to update dependencies first
+            try {
+                echo "Running 'npm update'..."
+                sh 'npm update --save'
+            } catch (Exception updateError) {
+                echo "npm update failed with ERESOLVE. Proceeding with --legacy-peer-deps..."
+            }
+
+            // Install dependencies with --legacy-peer-deps to bypass strict conflicts
+            try {
+                echo "Running 'npm install --legacy-peer-deps'..."
+                sh 'npm install --legacy-peer-deps'
+            } catch (Exception legacyError) {
+                echo "npm install with --legacy-peer-deps failed. Attempting with --force..."
+
+                // Fallback: Force install as a last resort
+                echo "Running 'npm install --force'..."
+                sh 'npm install --force'
+            }
         } else if (fileExists('pom.xml')) {
             echo "pom.xml found. Updating Maven dependencies."
             sh 'mvn versions:use-latest-versions -DgenerateBackupPoms=false'

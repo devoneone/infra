@@ -31,7 +31,6 @@ configure_database() {
             ENV_DB_VAR="POSTGRES_DB"
             DB_PORT=5432
             VOLUME_MOUNT_PATH="/var/lib/postgresql/data"
-            HEALTHCHECK_CMD='["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]'
             ;;
         "mysql")
             DB_IMAGE="mysql:${DB_VERSION}"
@@ -40,7 +39,6 @@ configure_database() {
             ENV_DB_VAR="MYSQL_DATABASE"
             DB_PORT=3306
             VOLUME_MOUNT_PATH="/var/lib/mysql"
-            HEALTHCHECK_CMD='["CMD", "mysqladmin", "ping", "-h", "localhost"]'
             ;;
         "mongodb")
             DB_IMAGE="mongo:${DB_VERSION}"
@@ -49,7 +47,6 @@ configure_database() {
             ENV_DB_VAR="MONGO_INITDB_DATABASE"
             DB_PORT=27017
             VOLUME_MOUNT_PATH="/data/db"
-            HEALTHCHECK_CMD='["CMD", "mongosh", "--eval", "db.adminCommand(\"ping\")"]'
             ;;
         *)
             echo "❌ Unsupported database type. Use postgres, mysql, or mongodb."
@@ -244,21 +241,6 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-        startupProbe:
-          exec:
-            command: ${HEALTHCHECK_CMD}
-          failureThreshold: 30
-          periodSeconds: 10
-        readinessProbe:
-          exec:
-            command: ${HEALTHCHECK_CMD}
-          initialDelaySeconds: 20
-          periodSeconds: 10
-        livenessProbe:
-          exec:
-            command: ${HEALTHCHECK_CMD}
-          initialDelaySeconds: 30
-          periodSeconds: 10
       volumes:
       - name: data
         persistentVolumeClaim:

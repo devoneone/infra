@@ -288,7 +288,7 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: "${DB_TYPE}"
 spec:
   rules:
-  - host: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}
+  - host: ${DOMAIN_NAME}
     http:
       paths:
       - path: /
@@ -300,7 +300,7 @@ spec:
               number: ${DB_PORT}
   tls:
   - hosts:
-    - ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}
+    - ${DOMAIN_NAME}
     secretName: ${DB_NAME}-tls
 EOF
     fi

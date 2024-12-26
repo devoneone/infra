@@ -260,7 +260,7 @@ metadata:
     app: ${DB_NAME}
     type: database
 spec:
-  type: ClusterIP
+  type: NodePort
   ports:
     - port: ${DB_PORT}
       targetPort: ${DB_PORT}

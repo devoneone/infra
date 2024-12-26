@@ -4,11 +4,22 @@
 DB_NAME=$1
 DB_TYPE=$2
 DB_VERSION=$3
-NAMESPACE=${4:-default}
+NAMESPACE=${4:-default}  # This will be the username in your case
 DB_PASSWORD=$5
 DB_USERNAME=${6:-defaultUser}
 DOMAIN_NAME=$7
 STORAGE_SIZE=${8:-1Gi}
+
+# Function to validate unique deployment
+validate_unique_deployment() {
+    echo "🔍 Checking for conflicts..."
+    
+    # Check if database name exists in namespace
+    if kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME} 2>/dev/null | grep -q "${DB_NAME}"; then
+        echo "❌ Database '${DB_NAME}' already exists in namespace '${NAMESPACE}'"
+        exit 1
+    fi
+}
 
 # Function to set database-specific configurations
 configure_database() {
@@ -50,7 +61,6 @@ configure_database() {
 # Create the StorageClass
 create_storage_class() {
     if ! kubectl get storageclass local-storage &>/dev/null; then
-        echo "Creating StorageClass 'local-storage'..."
         cat <<EOF | kubectl apply -f -
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -60,12 +70,10 @@ provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Retain
 EOF
-    else
-        echo "StorageClass 'local-storage' already exists."
     fi
 }
 
-# Create the NetworkPolicy
+# Create NetworkPolicy
 create_network_policy() {
     cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
@@ -82,10 +90,7 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          type: application
-    - podSelector:
-        matchLabels:
-          type: application
+          name: ${NAMESPACE}
     ports:
     - protocol: TCP
       port: ${DB_PORT}
@@ -96,9 +101,13 @@ EOF
 
 # Create namespace and secret
 create_namespace_resources() {
+    # Create namespace if not exists
     kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-    kubectl label namespace ${NAMESPACE} type=application --overwrite
+    
+    # Label namespace for network policies
+    kubectl label namespace ${NAMESPACE} name=${NAMESPACE} --overwrite
 
+    # Create secret for database credentials
     kubectl create secret generic ${DB_NAME}-secret \
         --from-literal=${ENV_USERNAME_VAR}=${DB_USERNAME} \
         --from-literal=${ENV_PASSWORD_VAR}=${DB_PASSWORD} \
@@ -107,16 +116,25 @@ create_namespace_resources() {
         --dry-run=client -o yaml | kubectl apply -f -
 }
 
+# Initialize host directory
+initialize_host_directory() {
+    echo "Creating storage directory..."
+    sudo mkdir -p /data/${NAMESPACE}/${DB_NAME}
+    sudo chown -R 999:999 /data/${NAMESPACE}/${DB_NAME}
+    sudo chmod -R 700 /data/${NAMESPACE}/${DB_NAME}
+}
+
 # Create PV
 create_persistent_volume() {
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: ${DB_NAME}-pv
+  name: ${NAMESPACE}-${DB_NAME}-pv
   labels:
     type: database
     app: ${DB_NAME}
+    namespace: ${NAMESPACE}
 spec:
   capacity:
     storage: ${STORAGE_SIZE}
@@ -157,6 +175,7 @@ spec:
     matchLabels:
       type: database
       app: ${DB_NAME}
+      namespace: ${NAMESPACE}
 EOF
 }
 
@@ -273,7 +292,8 @@ EOF
 
 # Create Ingress
 create_ingress() {
-    cat <<EOF | kubectl apply -f -
+    if [ ! -z "${DOMAIN_NAME}" ]; then
+        cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -284,12 +304,9 @@ metadata:
     cert-manager.io/cluster-issuer: "letsencrypt-dns"
     nginx.ingress.kubernetes.io/ssl-passthrough: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "${DB_TYPE}"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 spec:
   rules:
-  - host: ${DOMAIN_NAME}
+  - host: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}
     http:
       paths:
       - path: /
@@ -301,30 +318,22 @@ spec:
               number: ${DB_PORT}
   tls:
   - hosts:
-    - ${DOMAIN_NAME}
+    - ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}
     secretName: ${DB_NAME}-tls
 EOF
-}
-
-# Initialize host directory
-initialize_host_directory() {
-    echo "Creating and setting permissions for host directory..."
-    sudo mkdir -p /data/${NAMESPACE}/${DB_NAME}
-    sudo chown -R 999:999 /data/${NAMESPACE}/${DB_NAME}
-    sudo chmod -R 700 /data/${NAMESPACE}/${DB_NAME}
+    fi
 }
 
 # Main deployment function
 main() {
     echo "🚀 Starting database deployment..."
-
+    
+    # Validate deployment
+    validate_unique_deployment
+    
     # Get node name for PV node affinity
     NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-    if [ -z "${NODE_NAME}" ]; then
-        echo "❌ Failed to get node name!"
-        exit 1
-    fi
-
+    
     echo "⚙️ Configuring database..."
     configure_database
     
@@ -355,8 +364,10 @@ main() {
     echo "🔌 Creating Service..."
     create_service
     
-    echo "🌐 Creating Ingress..."
-    create_ingress
+    if [ ! -z "${DOMAIN_NAME}" ]; then
+        echo "🌐 Creating Ingress..."
+        create_ingress
+    fi
     
     echo "✅ Database deployment completed successfully!"
     echo ""
@@ -369,10 +380,13 @@ main() {
     echo ""
     echo "🔌 Connection Information:"
     echo "  - Internal: ${DB_NAME}.${NAMESPACE}.svc.cluster.local:${DB_PORT}"
-    echo "  - External: ${DB_NAME}.${DOMAIN_NAME}"
+    if [ ! -z "${DOMAIN_NAME}" ]; then
+        echo "  - External: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}"
+    fi
     echo ""
     echo "⏳ Wait for the database to be ready:"
     echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME} -w"
+    echo "  kubectl logs -f -n ${NAMESPACE} -l app=${DB_NAME}"
 }
 
 # Execute main function

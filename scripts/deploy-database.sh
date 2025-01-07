@@ -1,14 +1,20 @@
 #!/bin/bash
 
 # Input variables
-DB_NAME=$1
-DB_TYPE=$2
-DB_VERSION=$3
-NAMESPACE=${4:-default}  # This will be the username in your case
-DB_PASSWORD=$5
-DB_USERNAME=${6:-defaultUser}
-DOMAIN_NAME=$7
-STORAGE_SIZE=${8:-1Gi}
+DB_NAME=$1                  # Database name (required)
+DB_TYPE=$2                  # Database type (required)
+DB_VERSION=$3               # Database version (required)
+NAMESPACE=${4:-default}     # Default namespace
+DB_PASSWORD=$5              # Database password (required for MySQL)
+DB_USERNAME=${6:-defaultUser} # Database username (default for MySQL)
+DOMAIN_NAME=$7              # Optional domain name for Ingress
+STORAGE_SIZE=${8:-1Gi}      # Default storage size
+
+# Set MySQL-specific defaults
+if [ "${DB_TYPE}" == "mysql" ]; then
+    DB_PASSWORD=${DB_PASSWORD:-rootpassword}   # Default MySQL root password
+    DB_USERNAME=${DB_USERNAME:-defaultuser}    # Default MySQL username
+fi
 
 # Function to validate unique deployment
 validate_unique_deployment() {
@@ -24,6 +30,15 @@ validate_unique_deployment() {
 # Function to set database-specific configurations
 configure_database() {
     case ${DB_TYPE} in
+        "mysql")
+            DB_IMAGE="mysql:${DB_VERSION}"
+            ENV_ROOT_PASSWORD_VAR="MYSQL_ROOT_PASSWORD"
+            ENV_USERNAME_VAR="MYSQL_USER"
+            ENV_PASSWORD_VAR="MYSQL_PASSWORD"
+            ENV_DB_VAR="MYSQL_DATABASE"
+            DB_PORT=3306
+            VOLUME_MOUNT_PATH="/var/lib/mysql"
+            ;;
         "postgres")
             DB_IMAGE="postgres:${DB_VERSION}"
             ENV_USERNAME_VAR="POSTGRES_USER"
@@ -31,14 +46,6 @@ configure_database() {
             ENV_DB_VAR="POSTGRES_DB"
             DB_PORT=5432
             VOLUME_MOUNT_PATH="/var/lib/postgresql/data"
-            ;;
-        "mysql")
-            DB_IMAGE="mysql:${DB_VERSION}"
-            ENV_USERNAME_VAR="MYSQL_USER"
-            ENV_PASSWORD_VAR="MYSQL_ROOT_PASSWORD"
-            ENV_DB_VAR="MYSQL_DATABASE"
-            DB_PORT=3306
-            VOLUME_MOUNT_PATH="/var/lib/mysql"
             ;;
         "mongodb")
             DB_IMAGE="mongo:${DB_VERSION}"
@@ -105,12 +112,22 @@ create_namespace_resources() {
     kubectl label namespace ${NAMESPACE} name=${NAMESPACE} --overwrite
 
     # Create secret for database credentials
-    kubectl create secret generic ${DB_NAME}-secret \
-        --from-literal=${ENV_USERNAME_VAR}=${DB_USERNAME} \
-        --from-literal=${ENV_PASSWORD_VAR}=${DB_PASSWORD} \
-        --from-literal=${ENV_DB_VAR}=${DB_NAME} \
-        --namespace=${NAMESPACE} \
-        --dry-run=client -o yaml | kubectl apply -f -
+    if [ "${DB_TYPE}" == "mysql" ]; then
+        kubectl create secret generic ${DB_NAME}-secret \
+            --from-literal=${ENV_ROOT_PASSWORD_VAR}=${DB_PASSWORD} \
+            --from-literal=${ENV_USERNAME_VAR}=${DB_USERNAME} \
+            --from-literal=${ENV_PASSWORD_VAR}=${DB_PASSWORD} \
+            --from-literal=${ENV_DB_VAR}=${DB_NAME} \
+            --namespace=${NAMESPACE} \
+            --dry-run=client -o yaml | kubectl apply -f -
+    else
+        kubectl create secret generic ${DB_NAME}-secret \
+            --from-literal=${ENV_USERNAME_VAR}=${DB_USERNAME} \
+            --from-literal=${ENV_PASSWORD_VAR}=${DB_PASSWORD} \
+            --from-literal=${ENV_DB_VAR}=${DB_NAME} \
+            --namespace=${NAMESPACE} \
+            --dry-run=client -o yaml | kubectl apply -f -
+    fi
 }
 
 # Initialize host directory
@@ -227,6 +244,20 @@ spec:
             secretKeyRef:
               name: ${DB_NAME}-secret
               key: ${ENV_DB_VAR}
+EOF
+
+    # Add MySQL-specific environment variables
+    if [ "${DB_TYPE}" == "mysql" ]; then
+        cat <<EOF | kubectl apply -f -
+        - name: ${ENV_ROOT_PASSWORD_VAR}
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: ${ENV_ROOT_PASSWORD_VAR}
+EOF
+    fi
+
+    cat <<EOF | kubectl apply -f -
         ports:
         - name: db-port
           containerPort: ${DB_PORT}

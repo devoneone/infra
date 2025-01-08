@@ -7,14 +7,14 @@ WORKDIR /app
 # Copy the package.json and package-lock.json files to the container
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN {{packageManager}} install
+# Install dependencies, including web-vitals
+RUN npm install && npm install web-vitals
 
 # Copy all other project files to working directory
 COPY . .
 
 # Run the React build process and generate the artifacts
-RUN {{packageManager}} run build
+RUN npm run build
 
 # Multi-stage build process
 FROM nginx:alpine

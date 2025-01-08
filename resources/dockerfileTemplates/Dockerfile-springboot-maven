@@ -1,4 +1,15 @@
+# Builder stage
+FROM maven:3.8.6-openjdk-17-slim AS builder
+WORKDIR /app
+COPY . .
+# Note: Skipping tests is generally not recommended except for diagnostic purposes.
+RUN mvn clean package -DskipTests
+
+# Final stage
 FROM openjdk:17-alpine
-COPY target/*.jar app.jar
+WORKDIR /app
+# Copy the built JAR from the builder stage and rename it for simplicity
+COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app.jar"]
+# Now you can reference a fixed name in the ENTRYPOINT
+ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=prod", "app.jar"]

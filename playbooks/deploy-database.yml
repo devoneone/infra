@@ -20,3 +20,4 @@
         {{ DB_USERNAME }} 
         {{ DOMAIN_NAME }} 
         {{ STORAGE_SIZE }}
+        {{ PORT }}

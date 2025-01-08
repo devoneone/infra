@@ -59,7 +59,7 @@ metadata:
   name: ${APP_NAME}
   namespace: ${NAMESPACE}
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: ${APP_NAME}
   ports:

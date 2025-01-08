@@ -9,7 +9,7 @@ DB_PASSWORD=$5              # Database password (required for MySQL)
 DB_USERNAME=${6:-defaultUser} # Database username (default for MySQL)
 DOMAIN_NAME=$7              # Optional domain name for Ingress
 STORAGE_SIZE=${8:-1Gi}      # Default storage size
-
+PORT=${9:-30000}            # Default port for NodePort (optional, default is 30000)
 # Set MySQL-specific defaults
 if [ "${DB_TYPE}" == "mysql" ]; then
     DB_PASSWORD=${DB_PASSWORD:-rootpassword}   # Default MySQL root password
@@ -297,6 +297,7 @@ spec:
       targetPort: ${DB_PORT}
       protocol: TCP
       name: db-port
+      nodePort: ${NODE_PORT}  # Use the provided NodePort
   selector:
     app: ${DB_NAME}
     type: database
@@ -397,7 +398,7 @@ main() {
     if [ ! -z "${DOMAIN_NAME}" ]; then
         echo "  - External: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}"
     fi
-    echo ""
+echo "  - NodePort: ${PORT}"  # Add PORT to the output
     echo "⏳ Wait for the database to be ready:"
     echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME} -w"
     echo "  kubectl logs -f -n ${NAMESPACE} -l app=${DB_NAME}"

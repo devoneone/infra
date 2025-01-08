@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN {{packageManager}} install
+RUN {{packageManager}} ci
 
 # Copy all other project files to working directory
 COPY . .

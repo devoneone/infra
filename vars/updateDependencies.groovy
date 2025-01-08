@@ -22,13 +22,13 @@ def call() {
                 echo "Running 'npm install --force'..."
                 sh 'npm install --force'
             }
-        } else if (fileExists('pom.xml')) {
-        sh 'mvn versions:use-latest-versions'
-    } else if (fileExists('build.gradle') || fileExists('build.gradle.kts')) {
-        sh 'gradle useLatestVersions'
-    } else {
-        echo "No recognized dependency file found. Skipping dependency update."
-    }
+    //     } else if (fileExists('pom.xml')) {
+    //     sh 'mvn versions:use-latest-versions'
+    // } else if (fileExists('build.gradle') || fileExists('build.gradle.kts')) {
+    //     sh 'gradle useLatestVersions'
+    // } else {
+    //     echo "No recognized dependency file found. Skipping dependency update."
+    // }
     } catch (Exception e) {
         echo "An error occurred while updating dependencies: ${e.getMessage()}"
         currentBuild.result = 'FAILURE'

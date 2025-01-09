@@ -90,7 +90,7 @@ def detectProjectType(String projectPath = '.') {
                 return [type: 'vite-react', port: 80]
             } else {
                 echo "React project detected, setting port to 3000"
-                return [type: 'react', port: 3000]
+                return [type: 'react', port: 80]
             }
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"

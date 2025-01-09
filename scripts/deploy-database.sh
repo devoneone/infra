@@ -230,6 +230,11 @@ spec:
           capabilities:
             drop: ["ALL"]
         env:
+        - name: ${ENV_ROOT_PASSWORD_VAR}
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: ${ENV_ROOT_PASSWORD_VAR}
         - name: ${ENV_USERNAME_VAR}
           valueFrom:
             secretKeyRef:
@@ -245,20 +250,6 @@ spec:
             secretKeyRef:
               name: ${DB_NAME}-secret
               key: ${ENV_DB_VAR}
-EOF
-
-    # Add MySQL-specific environment variables
-    if [ "${DB_TYPE}" == "mysql" ]; then
-        cat <<EOF | kubectl apply -f -
-        - name: ${ENV_ROOT_PASSWORD_VAR}
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-secret
-              key: ${ENV_ROOT_PASSWORD_VAR}
-EOF
-    fi
-
-    cat <<EOF | kubectl apply -f -
         ports:
         - name: db-port
           containerPort: ${DB_PORT}

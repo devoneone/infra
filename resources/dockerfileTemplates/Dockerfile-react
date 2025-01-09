@@ -1,29 +1,29 @@
 # Use an official Node.js runtime as a parent image
-FROM node:18 AS builder
+FROM node:16-alpine as build
 
-# Set the working directory to /app
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy the package.json and package-lock.json files to the container
-COPY package.json package-lock.json ./
+# Copy the package.json and package-lock.json files
+COPY package*.json ./
 
-# Install dependencies, including web-vitals
-RUN npm install && npm install web-vitals
+# Install dependencies
+RUN npm install
 
-# Copy all other project files to working directory
+# Copy the rest of the application code
 COPY . .
 
-# Run the React build process and generate the artifacts
+# Build the React application
 RUN npm run build
 
-# Multi-stage build process
+# Use a lightweight web server to serve the built application
 FROM nginx:alpine
 
-# Copy the build artifacts from the builder stage
-COPY --from=builder /app/build /usr/share/nginx/html
+# Copy the built application from the previous stage
+COPY --from=build /app/build /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80
 
-# Start Nginx server
+# Start the Nginx server
 CMD ["nginx", "-g", "daemon off;"]

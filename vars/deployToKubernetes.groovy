@@ -89,19 +89,19 @@ def detectProjectType(String projectPath = '.') {
                 echo "React Vite project detected, setting port to 80"
                 return [type: 'vite-react', port: 80]
             } else {
-                echo "React project detected, setting port to 3000"
+                echo "React project detected, setting port to 80"
                 return [type: 'react', port: 80]
             }
+        }else if (packageJson.dependencies?.nuxt || packageJson.devDependencies?.nuxt) {
+            echo "Nuxt.js project detected, setting port to 3000"
+            return [type: 'nuxtjs', port: 3000]
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"
             return [type: 'vuejs', port: 80]
         } else if (packageJson.dependencies?.angular || packageJson.devDependencies?.angular) {
             echo "Angular project detected, setting port to 4200"
             return [type: 'angular', port: 4200]
-        } else if (packageJson.dependencies?.nuxt || packageJson.devDependencies?.nuxt) {
-            echo "Nuxt.js project detected, setting port to 3000"
-            return [type: 'nuxtjs', port: 3000]
-        } else if (packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte) {
+        }  else if (packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte) {
             echo "Svelte project detected, setting port to 5000"
             return [type: 'svelte', port: 5000]
         } else if (packageJson.dependencies?.express || packageJson.devDependencies?.express) {

@@ -75,7 +75,7 @@ def detectProjectType(String projectPath = '.') {
     try {
         if (fileExists("${projectPath}/artisan")) {
         echo "Laravel project detected"
-        return [type: 'laravel', port: 8000]
+        return [type: 'laravel', port: 80]
     }
     else if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"

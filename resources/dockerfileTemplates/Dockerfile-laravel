@@ -1,48 +1,52 @@
-# Use PHP 8.2 FPM Alpine as base image
-FROM php:8.2-fpm-alpine
-
-# Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    postgresql-dev \
-    libzip-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    zip \
-    unzip \
-    git \
-    supervisor
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo pdo_mysql pdo_pgsql zip exif pcntl bcmath gd
-
-# Install Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Stage 1: Build the application
+FROM php:8.3.0RC6-cli as builder
 
 # Set working directory
-WORKDIR /var/www/html
+WORKDIR /app
 
-# Copy application files
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy Laravel application files
 COPY . .
 
-# Copy configuration files
-COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
-COPY docker/php/php.ini /usr/local/etc/php/php.ini
-COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Install dependencies using composer
+RUN composer install --no-dev --no-interaction --no-progress --no-suggest --ignore-platform-req=ext-http --ignore-platform-req=ext-xdebug
+RUN docker-php-ext-install pdo_mysql
+#RUN docker-php-ext-install mbstring
+RUN docker-php-ext-install exif
+RUN docker-php-ext-install pcntl
+RUN docker-php-ext-install bcmath
+#RUN docker-php-ext-install gd
 
-# Install application dependencies
-RUN composer install --optimize-autoloader --no-dev
+# Generate an optimized autoloader
+RUN composer dump-autoload --optimize --classmap-authoritative
 
-# Generate application key
+# Generate the application key
 RUN php artisan key:generate
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage
+# Build the application
+RUN php artisan config:cache
+RUN php artisan route:cache
+#RUN php artisan view:cache
 
-# Expose port 80
-EXPOSE 80
+# Stage 2: Create final image
+FROM php:8.3.0RC6-cli
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Set working directory
+WORKDIR /app
+
+# Copy built application from the builder stage
+COPY --from=builder /app .
+
+# Expose the application port (if needed)
+EXPOSE 8000
+
+# Run the application
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

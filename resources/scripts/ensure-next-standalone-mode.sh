@@ -26,7 +26,7 @@ update_next_config() {
     
     # Add output: "standalone" to the nextConfig object
     awk '
-    /const nextConfig/ {
+    /const nextConfig = {/ {
         print $0
         print "    output: \"standalone\","
         next

@@ -10,6 +10,7 @@ COPY package.json package-lock.json ./
 # Copy all other project files to working directory
 COPY . .
 RUN npm install -g {{packageManager}} 
+RUN npm install --legacy-peer-deps
 # if use Image
 RUN {{packageManager}} i sharp --force
 

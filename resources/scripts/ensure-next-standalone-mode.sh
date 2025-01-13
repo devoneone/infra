@@ -24,14 +24,15 @@ update_next_config() {
     # Create temporary file
     local temp_file=$(mktemp)
     
-    # Add output: "standalone" to the nextConfig object
-    awk '
-    /const nextConfig = {/ {
-        print $0
-        print "    output: \"standalone\","
-        next
+    # Use sed to insert output: "standalone" inside the nextConfig object
+    sed -E '
+    /const nextConfig = \{/ {
+        N
+        s/(const nextConfig = \{)\n/\1\n    output: "standalone",\n/
     }
-    { print $0 }
+    /const nextConfig = \{\};/ {
+        s/const nextConfig = \{\};/const nextConfig = {\n    output: "standalone",\n};/
+    }
     ' "$config_file" > "$temp_file"
     
     # Replace original file with modified content

@@ -11,7 +11,7 @@ COPY package.json package-lock.json ./
 COPY . .
 RUN npm install -g {{packageManager}} 
 # if use Image
-RUN {{packageManager}} i sharp
+RUN {{packageManager}} i sharp --force
 
 # Run the next build process and generate the artifacts
 RUN {{packageManager}} run build

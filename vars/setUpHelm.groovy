@@ -1,11 +1,11 @@
 def call(String inventoryFile, String playbookFile, String serviceName, String image, 
-         String namespace, String tag, String domainName, String gitRepoUrl) {
+         String namespace, String tag, String domainName, String gitRepoUrl, String branch) {
     
     def tmpDir = "tmp-${serviceName}-${UUID.randomUUID().toString()}"
     
     try {
         dir(tmpDir) {
-            git(url: gitRepoUrl, branch: 'main', credentialsId: 'git-credentials')
+            git(url: gitRepoUrl, branch: branch, credentialsId: 'git-credentials')
         }
         
         def projectInfo = detectProjectType(tmpDir)

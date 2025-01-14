@@ -9,7 +9,7 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         dir(tmpDir) {
             git(
                 url: gitRepoUrl,
-                branch: '${branch}',  // or specify branch as parameter
+                branch: branch,  // or specify branch as parameter
                 credentialsId: 'git-credentials'  // specify your credentials ID
             )
         }

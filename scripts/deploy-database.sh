@@ -215,7 +215,7 @@ spec:
 EOF
 }
 
-# Create StatefulSet
+# Create StatefulSet with node selector
 create_statefulset() {
     # Base configuration for MongoDB and PostgreSQL
     if [ "${DB_TYPE}" != "mysql" ]; then
@@ -238,6 +238,8 @@ spec:
         app: ${DB_NAME}
         type: database
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: ${NODE_NAME}
       securityContext:
         fsGroup: 999
         runAsUser: 999
@@ -308,6 +310,8 @@ spec:
         app: ${DB_NAME}
         type: database
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: ${NODE_NAME}
       securityContext:
         fsGroup: 999
         runAsUser: 999
@@ -425,20 +429,18 @@ EOF
     fi
 }
 
-# Main deployment function
+# Main deployment function with corrected order
 main() {
     echo "🚀 Starting database deployment..."
     
-    # Create namespace first
-    echo "🔑 Creating namespace..."
-    create_namespace_resources
-    
-    # Validate deployment
-    validate_unique_deployment
-    
-    # Get node name for PV node affinity
+    # Get node name for PV node affinity first
     NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
     echo "Debug - Selected Node: ${NODE_NAME}"
+    
+    # Create namespace and validate
+    echo "🔑 Creating namespace..."
+    create_namespace_resources
+    validate_unique_deployment
     
     echo "⚙️ Configuring database..."
     configure_database
@@ -455,14 +457,16 @@ main() {
     echo "💾 Creating PV..."
     create_persistent_volume
     
+    # Create StatefulSet before PVC due to WaitForFirstConsumer
+    echo "🚀 Creating StatefulSet..."
+    create_statefulset
+    
     echo "📝 Creating PVC..."
     create_persistent_volume_claim
     
-    echo "⏳ Waiting for PVC to bind..."
-    kubectl wait --for=condition=Bound pvc/${DB_NAME}-pvc -n ${NAMESPACE} --timeout=60s
-    
-    echo "🚀 Creating StatefulSet..."
-    create_statefulset
+    # Wait for PVC binding and pod to be ready
+    echo "⏳ Waiting for PVC to bind and pod to be ready..."
+    kubectl wait --for=condition=Ready pod -l app=${DB_NAME} -n ${NAMESPACE} --timeout=300s
     
     echo "🔌 Creating Service..."
     create_service
@@ -487,8 +491,17 @@ main() {
         echo "  - External: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}"
     fi
     echo "  - NodePort: ${PORT}"
-    echo "⏳ Wait for the database to be ready:"
-    echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME} -w"
+    echo ""
+    echo "🔑 Credentials:"
+    echo "  - Username: ${DB_USERNAME}"
+    if [ "${DB_TYPE}" == "mysql" ]; then
+        echo "  - Root Password: ${DB_PASSWORD}"
+    else
+        echo "  - Password: ${DB_PASSWORD}"
+    fi
+    echo ""
+    echo "🔍 Monitor database status:"
+    echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME}"
     echo "  kubectl logs -f -n ${NAMESPACE} -l app=${DB_NAME}"
 }
 

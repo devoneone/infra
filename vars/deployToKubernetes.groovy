@@ -1,6 +1,6 @@
 
 def call(String inventoryFile, String playbookFile, String appName, String image, 
-         String namespace, String filePath, String domainName, String email, String gitRepoUrl) {
+         String namespace, String filePath, String domainName, String email, String gitRepoUrl , String branch) {
     
     def tmpDir = "tmp-${appName}-${UUID.randomUUID().toString()}"
     
@@ -9,7 +9,7 @@ def call(String inventoryFile, String playbookFile, String appName, String image
         dir(tmpDir) {
             git(
                 url: gitRepoUrl,
-                branch: 'main',  // or specify branch as parameter
+                branch: '${branch}',  // or specify branch as parameter
                 credentialsId: 'git-credentials'  // specify your credentials ID
             )
         }

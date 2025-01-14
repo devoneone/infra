@@ -1,0 +1,23 @@
+---
+- name: Deploy database with Kubernetes
+  hosts: kube_servers
+  become: yes
+  tasks:
+    - name: Copy database deployment script to Kubernetes server
+      copy:
+        src: ../scripts/deploy-database.sh
+        dest: /home/sen/cloudinator/deploy-database.sh
+        mode: '0755'
+
+    - name: Execute the database deployment script
+      command: >
+        bash /home/sen/cloudinator/deploy-database.sh 
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}

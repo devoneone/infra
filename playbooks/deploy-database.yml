@@ -4,7 +4,6 @@
   become: yes
   tasks:
     - name: check user
-      sudo: yes
       sudo_user: sen
       shell: whoami
     - name: Copy database deployment script to Kubernetes server

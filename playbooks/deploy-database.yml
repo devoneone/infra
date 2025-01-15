@@ -45,6 +45,30 @@
         {{ DOMAIN_NAME }} 
         {{ STORAGE_SIZE }}
         {{ PORT }}  
+    - name: Execute pv
+      command: >
+        bash /home/sen/cloudinator/pv.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}
+    - name: Execute pvc
+      command: >
+        bash /home/sen/cloudinator/pvc.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}
     - name: Execute statefulset
       command: >
         bash /home/sen/cloudinator/statefulset.sh

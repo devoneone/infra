@@ -3,6 +3,10 @@
   hosts: kube_servers
   become: yes
   tasks:
+    - name: check user
+      sudo: yes
+      sudo_user: sen
+      shell: whoami
     - name: Copy database deployment script to Kubernetes server
       copy:
         src: ../scripts/
@@ -10,8 +14,9 @@
         mode: '0755'
 
     - name: Execute the configuration db
-      command: >
-        bash /home/sen/cloudinator/database.sh
+      become_user: sen
+      shell: >
+        bash /home/sen/cloudinator/config.sh
         {{ DB_NAME }} 
         {{ DB_TYPE }} 
         {{ DB_VERSION }} 
@@ -21,87 +26,136 @@
         {{ DOMAIN_NAME }} 
         {{ STORAGE_SIZE }}
         {{ PORT }}
-    - name: Execute namespace
-      command: >
-        bash /home/sen/cloudinator/namespace.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute storage class
-      command: >
-        bash /home/sen/cloudinator/storage.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}  
-    - name: Execute pv
-      command: >
-        bash /home/sen/cloudinator/pv.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute pvc
-      command: >
-        bash /home/sen/cloudinator/pvc.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute statefulset
-      command: >
-        bash /home/sen/cloudinator/statefulset.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute service
-      command: >
-        bash /home/sen/cloudinator/service.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute ingress
-      command: >
-        bash /home/sen/cloudinator/ingress.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}  
+      register: config_output
+      ignore_errors: yes
+
+    - name: Debug the passed variables
+      debug:
+        msg:
+          - "DB_NAME: {{ DB_NAME }}"
+          - "DB_TYPE: {{ DB_TYPE }}"
+          - "DB_VERSION: {{ DB_VERSION }}"
+          - "NAMESPACE: {{ NAMESPACE }}"
+          - "DB_PASSWORD: {{ DB_PASSWORD }}"
+          - "DB_USERNAME: {{ DB_USERNAME }}"
+          - "DOMAIN_NAME: {{ DOMAIN_NAME }}"
+          - "STORAGE_SIZE: {{ STORAGE_SIZE }}"
+          - "PORT: {{ PORT }}"
+
+    - name: Test connectivity and command execution
+      shell: echo "Testing connectivity to server and basic shell command execution"
+      register: test_output
+
+    - name: Debug the test command output
+      debug:
+        msg:
+          - "Test command output: {{ test_output.stdout }}"
+          - "Test command error: {{ test_output.stderr }}"
+          - "Test command return code: {{ test_output.rc }}"
+
+    - name: Check config.sh execution result
+      debug:
+        msg:
+          - "Configuration script output: {{ config_output.stdout }}"
+          - "Configuration script error: {{ config_output.stderr }}"
+          - "Configuration script return code: {{ config_output.rc }}"
+
+    - name: Fail if the configuration script fails
+      fail:
+        msg: "Configuration script execution failed: {{ config_output.stderr }}"
+      when: config_output.rc != 0
+      # command: >
+      #   bash /home/sen/cloudinator/database.sh
+      #   {{ DB_NAME }} 
+      #   {{ DB_TYPE }} 
+      #   {{ DB_VERSION }} 
+      #   {{ NAMESPACE }} 
+      #   {{ DB_PASSWORD }} 
+      #   {{ DB_USERNAME }} 
+      #   {{ DOMAIN_NAME }} 
+      #   {{ STORAGE_SIZE }}
+      #   {{ PORT }}
+    # - name: Execute namespace
+    #   command: >
+    #     bash /home/sen/cloudinator/namespace.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute storage class
+    #   command: >
+    #     bash /home/sen/cloudinator/storage.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}  
+    # - name: Execute pv
+    #   command: >
+    #     bash /home/sen/cloudinator/pv.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute pvc
+    #   command: >
+    #     bash /home/sen/cloudinator/pvc.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute statefulset
+    #   command: >
+    #     bash /home/sen/cloudinator/statefulset.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute service
+    #   command: >
+    #     bash /home/sen/cloudinator/service.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute ingress
+    #   command: >
+    #     bash /home/sen/cloudinator/ingress.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}  

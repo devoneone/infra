@@ -15,7 +15,7 @@ PORT=${9:-30000}           # Default port for NodePort
 
 # Create PVC
 create_persistent_volume_claim() {
-    cat <<EOF | kubectl apply -f -
+    cat <<EOF | sudo kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

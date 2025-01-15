@@ -13,8 +13,8 @@ PORT=${9:-30000}           # Default port for NodePort
 
 # Create PV
 create_persistent_volume() {
-    NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-    cat <<EOF | kubectl apply -f -
+    NODE_NAME=$(sudo kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+    cat <<EOF | sudo kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
 metadata:

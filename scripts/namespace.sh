@@ -12,6 +12,7 @@ PORT=${9:-30000}           # Default port for NodePort
 
 # Create namespace and secret
 create_namespace_resources() {
+    mkdir namespace
     kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
     
     if [ "${DB_TYPE}" == "mysql" ]; then

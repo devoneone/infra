@@ -293,7 +293,6 @@ EOF
 
 # Main deployment function
 main() {
-    set -x  # Enable debugging
 
     echo "Starting database deployment..."
 
@@ -333,7 +332,6 @@ main() {
     create_ingress
     echo "Ingress created."
 
-    set +x  # Disable debugging
 
     echo "✅ Database deployment completed!"
     echo "Access Info:"

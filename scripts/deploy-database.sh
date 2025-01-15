@@ -161,7 +161,82 @@ EOF
 
 # Create StatefulSet
 create_statefulset() {
-    cat <<EOF | kubectl apply -f -
+    if [ "${DB_TYPE}" == "mysql" ]; then
+        cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ${DB_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  serviceName: ${DB_NAME}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${DB_NAME}
+      type: database
+  template:
+    metadata:
+      labels:
+        app: ${DB_NAME}
+        type: database
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsUser: 999
+        runAsGroup: 999
+      containers:
+      - name: ${DB_NAME}
+        image: ${DB_IMAGE}
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 999
+          runAsGroup: 999
+          capabilities:
+            drop: ["ALL"]
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: MYSQL_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-secret
+              key: MYSQL_DATABASE
+        ports:
+        - name: db-port
+          containerPort: ${DB_PORT}
+          protocol: TCP
+        volumeMounts:
+        - name: data
+          mountPath: ${VOLUME_MOUNT_PATH}
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: ${DB_NAME}-pvc
+EOF
+    else
+        cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -229,6 +304,7 @@ spec:
         persistentVolumeClaim:
           claimName: ${DB_NAME}-pvc
 EOF
+    fi
 }
 
 # Create Service

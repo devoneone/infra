@@ -3,9 +3,7 @@
   hosts: kube_servers
   become: yes
   tasks:
-    - name: check user
-      sudo_user: sen
-      shell: whoami
+
     - name: Copy database deployment script to Kubernetes server
       copy:
         src: ../scripts/

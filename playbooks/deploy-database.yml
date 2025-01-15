@@ -5,8 +5,8 @@
   tasks:
     - name: Copy database deployment script to Kubernetes server
       copy:
-        src: ../scripts/deploy-database.sh
-        dest: /home/sen/cloudinator/deploy-database.sh
+        src: ../scripts/
+        dest: /home/sen/cloudinator/
         mode: '0755'
 
     - name: Execute the database deployment script

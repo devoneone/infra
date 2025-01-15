@@ -53,6 +53,7 @@ configure_database() {
             ENV_DB_VAR="MYSQL_DATABASE"
             DB_PORT=3306
             VOLUME_MOUNT_PATH="/var/lib/mysql"
+            READINESS_CMD="mysqladmin ping -h localhost -u${DB_USERNAME} -p${DB_PASSWORD}"
             ;;
         "postgres")
             DB_IMAGE="postgres:${DB_VERSION}"
@@ -61,6 +62,7 @@ configure_database() {
             ENV_DB_VAR="POSTGRES_DB"
             DB_PORT=5432
             VOLUME_MOUNT_PATH="/var/lib/postgresql/data"
+            READINESS_CMD="pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"
             ;;
         "mongodb")
             DB_IMAGE="mongo:${DB_VERSION}"
@@ -69,6 +71,7 @@ configure_database() {
             ENV_DB_VAR="MONGO_INITDB_DATABASE"
             DB_PORT=27017
             VOLUME_MOUNT_PATH="/data/db"
+            READINESS_CMD="mongosh --eval 'db.runCommand({ ping: 1 })'"
             ;;
         *)
             echo "❌ Unsupported database type. Use postgres, mysql, or mongodb."
@@ -126,7 +129,7 @@ EOF
     fi
 }
 
-# Create NetworkPolicy
+# Create NetworkPolicy that allows external access
 create_network_policy() {
     cat <<EOF | kubectl apply -f -
 apiVersion: networking.k8s.io/v1
@@ -138,13 +141,8 @@ spec:
   podSelector:
     matchLabels:
       app: ${DB_NAME}
-      type: database
   ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: ${NAMESPACE}
-    ports:
+  - ports:
     - protocol: TCP
       port: ${DB_PORT}
   policyTypes:
@@ -162,6 +160,9 @@ initialize_host_directory() {
 
 # Create PV
 create_persistent_volume() {
+    # Get first available node
+    NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+    
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: PersistentVolume
@@ -215,11 +216,9 @@ spec:
 EOF
 }
 
-# Create StatefulSet with node selector
+# Create StatefulSet
 create_statefulset() {
-    # Base configuration for MongoDB and PostgreSQL
-    if [ "${DB_TYPE}" != "mysql" ]; then
-        cat <<EOF | kubectl apply -f -
+    cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -238,8 +237,6 @@ spec:
         app: ${DB_NAME}
         type: database
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: ${NODE_NAME}
       securityContext:
         fsGroup: 999
         runAsUser: 999
@@ -284,89 +281,21 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        readinessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "${READINESS_CMD}"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: ${DB_PORT}
+          initialDelaySeconds: 30
+          periodSeconds: 10
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: ${DB_NAME}-pvc
 EOF
-    else
-        # MySQL-specific configuration
-        cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: ${DB_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  serviceName: ${DB_NAME}
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${DB_NAME}
-      type: database
-  template:
-    metadata:
-      labels:
-        app: ${DB_NAME}
-        type: database
-    spec:
-      nodeSelector:
-        kubernetes.io/hostname: ${NODE_NAME}
-      securityContext:
-        fsGroup: 999
-        runAsUser: 999
-        runAsGroup: 999
-      containers:
-      - name: ${DB_NAME}
-        image: ${DB_IMAGE}
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsUser: 999
-          runAsGroup: 999
-          capabilities:
-            drop: ["ALL"]
-        env:
-        - name: ${ENV_ROOT_PASSWORD_VAR}
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-secret
-              key: ${ENV_ROOT_PASSWORD_VAR}
-        - name: ${ENV_USERNAME_VAR}
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-secret
-              key: ${ENV_USERNAME_VAR}
-        - name: ${ENV_PASSWORD_VAR}
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-secret
-              key: ${ENV_PASSWORD_VAR}
-        - name: ${ENV_DB_VAR}
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-secret
-              key: ${ENV_DB_VAR}
-        ports:
-        - name: db-port
-          containerPort: ${DB_PORT}
-          protocol: TCP
-        volumeMounts:
-        - name: data
-          mountPath: ${VOLUME_MOUNT_PATH}
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-      volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: ${DB_NAME}-pvc
-EOF
-    fi
 }
 
 # Create Service
@@ -429,13 +358,48 @@ EOF
     fi
 }
 
-# Main deployment function with corrected order
+# Test database connection
+test_database_connection() {
+    echo "🔍 Testing database connection..."
+    
+    # Wait for pod to be running
+    echo "⏳ Waiting for database pod to be ready..."
+    kubectl wait --for=condition=Ready pod -l app=${DB_NAME} -n ${NAMESPACE} --timeout=300s
+    
+    # Additional wait for database initialization
+    echo "⏳ Waiting for database initialization..."
+    sleep 30
+    
+    # Get service IP
+    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    echo "📌 Database is accessible at: ${NODE_IP}:${PORT}"
+    
+    # Test connection based on database type
+    case ${DB_TYPE} in
+        "mysql")
+            echo "🔍 Testing MySQL connection..."
+            kubectl run -n ${NAMESPACE} test-mysql --rm --image=mysql:${DB_VERSION} \
+                -i --restart=Never --command -- mysql -h ${DB_NAME} \
+                -u${DB_USERNAME} -p${DB_PASSWORD} -e "SELECT 1;" || true
+            ;;
+        "postgres")
+            echo "🔍 Testing PostgreSQL connection..."
+            kubectl run -n ${NAMESPACE} test-pg --rm --image=postgres:${DB_VERSION} \
+                -i --restart=Never --command -- psql -h ${DB_NAME} \
+                -U ${DB_USERNAME} -c "SELECT 1;" || true
+            ;;
+        "mongodb")
+            echo "🔍 Testing MongoDB connection..."
+            kubectl run -n ${NAMESPACE} test-mongo --rm --image=mongo:${DB_VERSION} \
+                -i --restart=Never --command -- mongosh --host ${DB_NAME} \
+                -u ${DB_USERNAME} -p ${DB_PASSWORD} --eval "db.runCommand({ping:1})" || true
+            ;;
+    esac
+}
+
+# Main deployment function
 main() {
     echo "🚀 Starting database deployment..."
-    
-    # Get node name for PV node affinity first
-    NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-    echo "Debug - Selected Node: ${NODE_NAME}"
     
     # Create namespace and validate
     echo "🔑 Creating namespace..."
@@ -457,16 +421,15 @@ main() {
     echo "💾 Creating PV..."
     create_persistent_volume
     
-    # Create StatefulSet before PVC due to WaitForFirstConsumer
-    echo "🚀 Creating StatefulSet..."
-    create_statefulset
-    
     echo "📝 Creating PVC..."
     create_persistent_volume_claim
     
-    # Wait for PVC binding and pod to be ready
-    echo "⏳ Waiting for PVC to bind and pod to be ready..."
-    kubectl wait --for=condition=Ready pod -l app=${DB_NAME} -n ${NAMESPACE} --timeout=300s
+    # Wait for PVC to be bound
+    echo "⏳ Waiting for PVC to bind..."
+    kubectl wait --for=condition=Bound pvc/${DB_NAME}-pvc -n ${NAMESPACE} --timeout=300s
+    
+    echo "🚀 Creating StatefulSet..."
+    create_statefulset
     
     echo "🔌 Creating Service..."
     create_service
@@ -475,6 +438,9 @@ main() {
         echo "🌐 Creating Ingress..."
         create_ingress
     fi
+    
+    # Test database connection
+    test_database_connection
     
     echo "✅ Database deployment completed successfully!"
     echo ""
@@ -490,7 +456,8 @@ main() {
     if [ ! -z "${DOMAIN_NAME}" ]; then
         echo "  - External: ${DB_NAME}-${NAMESPACE}.${DOMAIN_NAME}"
     fi
-    echo "  - NodePort: ${PORT}"
+    NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    echo "  - NodePort: ${NODE_IP}:${PORT}"
     echo ""
     echo "🔑 Credentials:"
     echo "  - Username: ${DB_USERNAME}"
@@ -503,6 +470,19 @@ main() {
     echo "🔍 Monitor database status:"
     echo "  kubectl get pods -n ${NAMESPACE} -l app=${DB_NAME}"
     echo "  kubectl logs -f -n ${NAMESPACE} -l app=${DB_NAME}"
+    echo ""
+    echo "🔍 Test database connection:"
+    case ${DB_TYPE} in
+        "mysql")
+            echo "  mysql -h ${NODE_IP} -P ${PORT} -u${DB_USERNAME} -p${DB_PASSWORD} ${DB_NAME}"
+            ;;
+        "postgres")
+            echo "  PGPASSWORD=${DB_PASSWORD} psql -h ${NODE_IP} -p ${PORT} -U ${DB_USERNAME} ${DB_NAME}"
+            ;;
+        "mongodb")
+            echo "  mongosh \"mongodb://${DB_USERNAME}:${DB_PASSWORD}@${NODE_IP}:${PORT}/${DB_NAME}\""
+            ;;
+    esac
 }
 
 # Execute main function

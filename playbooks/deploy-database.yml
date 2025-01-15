@@ -9,9 +9,9 @@
         dest: /home/sen/cloudinator/
         mode: '0755'
 
-    - name: Execute the database deployment script
+    - name: Execute the configuration db
       command: >
-        bash /home/sen/cloudinator/deploy-database.sh 
+        bash /home/sen/cloudinator/database.sh
         {{ DB_NAME }} 
         {{ DB_TYPE }} 
         {{ DB_VERSION }} 
@@ -21,3 +21,63 @@
         {{ DOMAIN_NAME }} 
         {{ STORAGE_SIZE }}
         {{ PORT }}
+    - name: Execute namespace
+      command: >
+        bash /home/sen/cloudinator/namespace.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}
+    - name: Execute storage class
+      command: >
+        bash /home/sen/cloudinator/storage.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}  
+    - name: Execute statefulset
+      command: >
+        bash /home/sen/cloudinator/stateful.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}
+    - name: Execute service
+      command: >
+        bash /home/sen/cloudinator/service.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}
+    - name: Execute ingress
+      command: >
+        bash /home/sen/cloudinator/ingress.sh
+        {{ DB_NAME }} 
+        {{ DB_TYPE }} 
+        {{ DB_VERSION }} 
+        {{ NAMESPACE }} 
+        {{ DB_PASSWORD }} 
+        {{ DB_USERNAME }} 
+        {{ DOMAIN_NAME }} 
+        {{ STORAGE_SIZE }}
+        {{ PORT }}  

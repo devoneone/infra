@@ -47,7 +47,7 @@
         {{ PORT }}  
     - name: Execute statefulset
       command: >
-        bash /home/sen/cloudinator/stateful.sh
+        bash /home/sen/cloudinator/statefulset.sh
         {{ DB_NAME }} 
         {{ DB_TYPE }} 
         {{ DB_VERSION }} 

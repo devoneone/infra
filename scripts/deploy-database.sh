@@ -148,7 +148,7 @@ metadata:
     namespace: ${NAMESPACE}
 spec:
   capacity:
-    storage: ${STORAGE_SIZE}
+    storage: 10Gi
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain

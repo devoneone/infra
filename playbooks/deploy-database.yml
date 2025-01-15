@@ -8,12 +8,12 @@
       copy:
         src: ../scripts/
         dest: /home/sen/cloudinator/
-        mode: '0755'
+        mode: '0777'
 
     - name: Execute the configuration db
       become_user: sen
       shell: >
-        bash /home/sen/cloudinator/database.sh
+        bash /home/sen/cloudinator/deploy-database.sh
         {{ DB_NAME }} 
         {{ DB_TYPE }} 
         {{ DB_VERSION }} 

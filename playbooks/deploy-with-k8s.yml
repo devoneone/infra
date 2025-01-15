@@ -3,6 +3,14 @@
   hosts: kube_servers
   become: yes
   tasks:
+    - name: Create required directories
+      file:
+        path: "/data/{{ NAMESPACE }}/{{ APP_NAME }}"
+        state: directory
+        mode: '0700'
+        owner: '999'
+        group: '999'
+      
     - name: Copy shell script to Kubernetes server
       copy:
         src: ../scripts/deploy-k8s.sh
@@ -19,3 +27,5 @@
         {{ DOMAIN_NAME }} 
         {{ EMAIL }}
         {{ PORT }}
+      args:
+        creates: "/data/{{ NAMESPACE }}/{{ APP_NAME }}"  # Idempotency check

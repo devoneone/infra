@@ -72,87 +72,87 @@
       #   {{ DOMAIN_NAME }} 
       #   {{ STORAGE_SIZE }}
       #   {{ PORT }}
-    - name: Execute namespace
-      command: >
-        bash /home/sen/cloudinator/namespace.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute storage class
-      command: >
-        bash /home/sen/cloudinator/storage.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}  
-    - name: Execute pv
-      command: >
-        bash /home/sen/cloudinator/pv.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute pvc
-      command: >
-        bash /home/sen/cloudinator/pvc.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute statefulset
-      command: >
-        bash /home/sen/cloudinator/statefulset.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute service
-      command: >
-        bash /home/sen/cloudinator/service.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}
-    - name: Execute ingress
-      command: >
-        bash /home/sen/cloudinator/ingress.sh
-        {{ DB_NAME }} 
-        {{ DB_TYPE }} 
-        {{ DB_VERSION }} 
-        {{ NAMESPACE }} 
-        {{ DB_PASSWORD }} 
-        {{ DB_USERNAME }} 
-        {{ DOMAIN_NAME }} 
-        {{ STORAGE_SIZE }}
-        {{ PORT }}  
+    # - name: Execute namespace
+    #   command: >
+    #     bash /home/sen/cloudinator/namespace.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute storage class
+    #   command: >
+    #     bash /home/sen/cloudinator/storage.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}  
+    # - name: Execute pv
+    #   command: >
+    #     bash /home/sen/cloudinator/pv.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute pvc
+    #   command: >
+    #     bash /home/sen/cloudinator/pvc.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute statefulset
+    #   command: >
+    #     bash /home/sen/cloudinator/statefulset.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute service
+    #   command: >
+    #     bash /home/sen/cloudinator/service.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}
+    # - name: Execute ingress
+    #   command: >
+    #     bash /home/sen/cloudinator/ingress.sh
+    #     {{ DB_NAME }} 
+    #     {{ DB_TYPE }} 
+    #     {{ DB_VERSION }} 
+    #     {{ NAMESPACE }} 
+    #     {{ DB_PASSWORD }} 
+    #     {{ DB_USERNAME }} 
+    #     {{ DOMAIN_NAME }} 
+    #     {{ STORAGE_SIZE }}
+    #     {{ PORT }}  

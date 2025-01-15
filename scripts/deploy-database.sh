@@ -173,6 +173,21 @@ EOF
         exit 1
     fi
 }
+validate_k8s_environment() {
+    echo "Validating Kubernetes environment..."
+    if ! command -v kubectl &>/dev/null; then
+        echo "❌ kubectl is not installed or not in PATH. Please install it first."
+        exit 1
+    fi
+
+    if ! kubectl version --client &>/dev/null; then
+        echo "❌ Unable to connect to the Kubernetes cluster. Ensure kubectl is configured correctly."
+        exit 1
+    fi
+
+    echo "✅ Kubernetes environment validated."
+}
+
 create_persistent_volume_claim() {
     echo "Creating PersistentVolumeClaim..."
     cat <<EOF | kubectl apply -f -

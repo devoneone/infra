@@ -18,6 +18,7 @@
         mode: '0755'
 
     - name: Execute the shell script with dynamic variables
+      become_user: sen
       command: >
         bash /home/sen/cloudinator/deploy-k8s.sh 
         {{ APP_NAME }} 

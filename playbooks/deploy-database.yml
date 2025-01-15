@@ -13,7 +13,7 @@
     - name: Execute the configuration db
       become_user: sen
       shell: >
-        bash /home/sen/cloudinator/config.sh
+        bash /home/sen/cloudinator/database.sh
         {{ DB_NAME }} 
         {{ DB_TYPE }} 
         {{ DB_VERSION }} 

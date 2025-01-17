@@ -80,7 +80,7 @@ metadata:
   namespace: ${NAMESPACE}
   annotations:
     kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-cloudflare"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     "nginx.ingress.kubernetes.io/rewrite-target": "/"
 spec:
   tls:

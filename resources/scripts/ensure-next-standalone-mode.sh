@@ -95,4 +95,3 @@ update_next_config() {
 update_next_config
 
 echo "Setup complete! Your Next.js project is now configured for standalone output"
-cat next.config.ts

@@ -24,21 +24,71 @@ update_next_config() {
     # Create temporary file
     local temp_file=$(mktemp)
     
-    # Use sed to insert output: "standalone" inside the nextConfig object
+    # Use sed with multiple patterns to handle all scenarios
     sed -E '
-    /const nextConfig = \{/ {
+    # Scenario 1: TypeScript with type declaration and multiple lines
+    /^const nextConfig: NextConfig = \{/ {
         N
-        s/(const nextConfig = \{)\n/\1\n    output: "standalone",\n/
+        s/(const nextConfig: NextConfig = \{)\n(\s*)/\1\n    output: "standalone",\n\2/
     }
-    /const nextConfig = \{\};/ {
-        s/const nextConfig = \{\};/const nextConfig = {\n    output: "standalone",\n};/
+    
+    # Scenario 2: TypeScript with empty config
+    /^const nextConfig: NextConfig = \{\};/ {
+        s/\{\}/{\n    output: "standalone",\n}/
+    }
+    
+    # Scenario 3: JavaScript module.exports with multiple lines
+    /^module\.exports = \{/ {
+        N
+        s/(module\.exports = \{)\n(\s*)/\1\n    output: "standalone",\n\2/
+    }
+    
+    # Scenario 4: JavaScript module.exports empty config
+    /^module\.exports = \{\};/ {
+        s/\{\}/{\n    output: "standalone",\n}/
+    }
+    
+    # Scenario 5: ES Modules export with multiple lines
+    /^export default \{/ {
+        N
+        s/(export default \{)\n(\s*)/\1\n    output: "standalone",\n\2/
+    }
+    
+    # Scenario 6: ES Modules empty export
+    /^export default \{\};/ {
+        s/\{\}/{\n    output: "standalone",\n}/
+    }
+    
+    # Scenario 7: Function-wrapped config
+    /return \{/ {
+        N
+        s/(return \{)\n(\s*)/\1\n    output: "standalone",\n\2/
+    }
+    
+    # Scenario 8: One-line configs
+    /^(const nextConfig: NextConfig = |module\.exports = |export default )\{ ?([^}]*)\};?/ {
+        s/\{([^}]*)\}/{\n    output: "standalone",\1\n}/
+    }
+    
+    # Scenario 9: Configs with withPlugins
+    /^(const nextConfig = .*withPlugins\(\[[^\]]*\],) \{/ {
+        N
+        s/(\{)\n(\s*)/\1\n    output: "standalone",\n\2/
     }
     ' "$config_file" > "$temp_file"
-    
-    # Replace original file with modified content
-    mv "$temp_file" "$config_file"
-    
-    echo "Updated $config_file with standalone configuration"
+
+    # Check if the file was modified
+    if ! cmp -s "$config_file" "$temp_file"; then
+        mv "$temp_file" "$config_file"
+        echo "Updated $config_file with standalone configuration"
+    else
+        rm "$temp_file"
+        echo "No changes were made. Please check your config file format."
+        
+        # Show the current config file content for debugging
+        echo "Current config file content:"
+        cat "$config_file"
+    fi
 }
 
 # Run the update function

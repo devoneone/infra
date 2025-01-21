@@ -1,0 +1,58 @@
+# Build stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json ./
+
+# First, install dependencies
+RUN npm install
+
+# Copy all source files
+COPY . .
+
+# Run build
+RUN npm run build
+
+# Check the actual build output structure
+RUN ls -la dist/ && \
+    echo "Build output structure:" && \
+    find dist/ -type f
+
+# Update package.json with correct path based on build output
+RUN node -e "\
+    const fs = require('fs'); \
+    const pkg = require('./package.json'); \
+    let serverPath = ''; \
+    if (fs.existsSync('./dist/server/main.server.mjs')) { \
+        serverPath = 'dist/server/main.server.mjs'; \
+    } else if (fs.existsSync('./dist/angular/server/server.mjs')) { \
+        serverPath = 'dist/angular/server/server.mjs'; \
+    } else { \
+        const files = fs.readdirSync('./dist'); \
+        console.log('Available files in dist:', files); \
+        throw new Error('Server file not found in expected locations'); \
+    } \
+    pkg.scripts['serve:ssr'] = 'node ' + serverPath; \
+    fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2)); \
+    console.log('Updated serve:ssr script to use:', serverPath);"
+
+# Production stage
+FROM node:18-alpine
+WORKDIR /app
+
+# Copy package.json and build output
+COPY --from=builder /app/package.json /app/package-lock.json ./
+COPY --from=builder /app/dist ./dist
+
+# Install production dependencies
+RUN npm install --production
+RUN npm install express
+
+# Set environment variables
+ENV PORT=4200
+EXPOSE 4200
+
+# Display final configuration
+RUN echo "Final package.json contents:" && cat package.json && \
+    echo "\nAvailable files:" && ls -R dist/
+
+CMD ["npm", "run", "serve:ssr"]

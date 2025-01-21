@@ -32,8 +32,12 @@ def dockerfileExists(String projectPath) {
 }
 
 def detectProjectType(String projectPath) {
-    echo "Checking for package.json in ${projectPath}"
-    if (fileExists("${projectPath}/artisan")) {
+    echo "Checking for angular.json in ${projectPath}"
+    if (fileExists("${projectPath}/angular.json")) {
+        echo "Angular project detected through angular.json, setting port to 4200"
+        return [type: 'angular', port: 4200]
+    }
+    else if (fileExists("${projectPath}/artisan")) {
         echo "Laravel project detected"
         return [type: 'laravel', port: 8000]
     }

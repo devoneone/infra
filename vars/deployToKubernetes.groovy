@@ -70,16 +70,19 @@ def validateParameters(String inventoryFile, String playbookFile, String appName
 }
 
 def detectProjectType(String projectPath = '.') {
-    echo "Detecting project type for path: ${projectPath}"
-    
-    try {
-        if (fileExists("${projectPath}/artisan")) {
+    echo "Checking for angular.json in ${projectPath}"
+    if (fileExists("${projectPath}/angular.json")) {
+        echo "Angular project detected through angular.json, setting port to 4200"
+        return [type: 'angular', port: 4200]
+    }
+    else if (fileExists("${projectPath}/artisan")) {
         echo "Laravel project detected"
-        return [type: 'laravel', port: 80]
+        return [type: 'laravel', port: 8000]
     }
     else if (fileExists("${projectPath}/package.json")) {
         def packageJson = readJSON file: "${projectPath}/package.json"
         echo "package.json contents: ${packageJson}"
+        
 
         if (packageJson.dependencies?.next || packageJson.devDependencies?.next) {
             echo "Next.js project detected, setting port to 3000"
@@ -104,10 +107,7 @@ def detectProjectType(String projectPath = '.') {
         }else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
             echo "Vue.js project detected, setting port to 8080"
             return [type: 'vuejs', port: 80]
-        } else if (packageJson.dependencies?.angular || packageJson.devDependencies?.angular) {
-            echo "Angular project detected, setting port to 4200"
-            return [type: 'angular', port: 4200]
-        }  else if (packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte) {
+        }else if (packageJson.dependencies?.svelte || packageJson.devDependencies?.svelte) {
             echo "Svelte project detected, setting port to 5000"
             return [type: 'svelte', port: 5000]
         } else if (packageJson.dependencies?.express || packageJson.devDependencies?.express) {

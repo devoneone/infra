@@ -97,7 +97,7 @@ def detectProjectType(String projectPath = '.') {
                 return [type: 'express', port: 3000]
             } else if (packageJson.dependencies?.nuxt || packageJson.devDependencies?.nuxt) {
                 echo "Nuxt.js project detected, setting port to 3000"
-                return [type: 'nuxtjs', port: 80]
+                return [type: 'nuxt', port: 80]
             } else if (packageJson.dependencies?.vue || packageJson.devDependencies?.vue) {
                 echo "Vue.js project detected, setting port to 8080"
                 return [type: 'vuejs', port: 80]

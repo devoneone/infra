@@ -1,52 +1,85 @@
 # Stage 1: Build the application
-FROM php:8.3.0RC6-cli as builder
+FROM php:8.2-cli as builder
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
+    libzip-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    pdo_mysql \
+    exif \
+    pcntl \
+    bcmath
 
 # Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy Laravel application files
+# Copy composer files
+COPY composer.json composer.lock ./
+
+# Install dependencies
+RUN composer install --no-dev --no-scripts --no-autoloader --no-interaction
+
+# Copy application files
 COPY . .
 
-# Install dependencies using composer
-RUN composer install --no-dev --no-interaction --no-progress --no-suggest --ignore-platform-req=ext-http --ignore-platform-req=ext-xdebug
-RUN docker-php-ext-install pdo_mysql
-#RUN docker-php-ext-install mbstring
-RUN docker-php-ext-install exif
-RUN docker-php-ext-install pcntl
-RUN docker-php-ext-install bcmath
-#RUN docker-php-ext-install gd
+# Set proper permissions
+RUN chown -R www-data:www-data /app \
+    && chmod -R 755 /app/storage
 
-# Generate an optimized autoloader
-RUN composer dump-autoload --optimize --classmap-authoritative
+# Generate optimized autoloader and run post-install scripts
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
-# Generate the application key
-RUN php artisan key:generate
-
-# Build the application
+# Laravel optimization
+RUN php artisan key:generate --force
 RUN php artisan config:cache
 RUN php artisan route:cache
-#RUN php artisan view:cache
+RUN php artisan view:cache
+RUN php artisan optimize
 
-# Stage 2: Create final image
-FROM php:8.3.0RC6-cli
+# Stage 2: Create production image
+FROM php:8.2-cli
+
+# Install system dependencies and extensions
+RUN apt-get update && apt-get install -y \
+    libzip-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install \
+        pdo_mysql \
+        exif \
+        pcntl \
+        bcmath
 
 # Set working directory
 WORKDIR /app
 
-# Copy built application from the builder stage
-COPY --from=builder /app .
+# Copy application from builder
+COPY --from=builder --chown=www-data:www-data /app .
 
-# Expose the application port (if needed)
+# Set environment variables
+ENV APP_ENV=production
+ENV APP_DEBUG=false
+
+# Create system user
+RUN addgroup --system --gid 1001 laravel && \
+    adduser --system --uid 1001 --ingroup laravel laravel
+
+# Set proper permissions
+RUN chown -R laravel:laravel /app \
+    && chmod -R 755 /app/storage
+
+# Switch to non-root user
+USER laravel
+
+# Expose port
 EXPOSE 8000
 
-# Run the application
+# Start application
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

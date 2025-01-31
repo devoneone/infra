@@ -1,0 +1,15 @@
+---
+- name: Delete all Kubernetes services in a namespace
+  hosts: kube_servers
+  become: yes
+
+  tasks:
+    - name: Copy shell script to Kubernetes server
+      copy:
+        src: ../scripts/delete_service.sh
+        dest: /home/sen/cloudinator/delete_service.sh
+        mode: '0755'
+
+    - name: Execute the shell script to scale deployments and delete all services
+      command: >
+        bash /home/sen/cloudinator/delete_service.sh {{ NAMESPACE }}

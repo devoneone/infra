@@ -367,9 +367,301 @@ EOF
     fi
 }
 
+# Function to create monitoring configurations
+create_monitoring_config() {
+    # Create configmap for exporters configuration
+    case ${DB_TYPE} in
+        "mysql")
+            create_mysql_monitoring
+            ;;
+        "postgres")
+            create_postgres_monitoring
+            ;;
+        "mongodb")
+            create_mongodb_monitoring
+            ;;
+    esac
+
+    # Create ServiceMonitor
+    create_service_monitor
+}
+
+# MySQL monitoring configuration
+create_mysql_monitoring() {
+    cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${DB_NAME}-mysqld-exporter
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${DB_NAME}-mysqld-exporter
+  template:
+    metadata:
+      labels:
+        app: ${DB_NAME}-mysqld-exporter
+    spec:
+      containers:
+      - name: mysqld-exporter
+        image: prom/mysqld-exporter:v0.14.0
+        args:
+        - --collect.info_schema.tables
+        - --collect.info_schema.tablestats
+        - --collect.global_status
+        - --collect.global_variables
+        - --collect.slave_status
+        - --collect.info_schema.processlist
+        ports:
+        - name: metrics
+          containerPort: 9104
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-monitoring-secret
+              key: DATA_SOURCE_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${DB_NAME}-mysqld-exporter
+  namespace: ${NAMESPACE}
+  labels:
+    app: ${DB_NAME}-mysqld-exporter
+spec:
+  ports:
+  - name: metrics
+    port: 9104
+    targetPort: metrics
+  selector:
+    app: ${DB_NAME}-mysqld-exporter
+EOF
+
+    # Create secret for mysqld-exporter
+    kubectl create secret generic ${DB_NAME}-monitoring-secret \
+        --namespace=${NAMESPACE} \
+        --from-literal=DATA_SOURCE_NAME="${DB_USERNAME}:${DB_PASSWORD}@(${DB_NAME}:3306)/" \
+        --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# PostgreSQL monitoring configuration
+create_postgres_monitoring() {
+    # Deploy postgres-exporter
+    cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${DB_NAME}-postgres-exporter
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${DB_NAME}-postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: ${DB_NAME}-postgres-exporter
+    spec:
+      containers:
+      - name: postgres-exporter
+        image: prometheuscommunity/postgres-exporter:v0.11.1
+        ports:
+        - name: metrics
+          containerPort: 9187
+        env:
+        - name: DATA_SOURCE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-monitoring-secret
+              key: DATA_SOURCE_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${DB_NAME}-postgres-exporter
+  namespace: ${NAMESPACE}
+  labels:
+    app: ${DB_NAME}-postgres-exporter
+spec:
+  ports:
+  - name: metrics
+    port: 9187
+    targetPort: metrics
+  selector:
+    app: ${DB_NAME}-postgres-exporter
+EOF
+
+    # Create secret for postgres-exporter
+    kubectl create secret generic ${DB_NAME}-monitoring-secret \
+        --namespace=${NAMESPACE} \
+        --from-literal=DATA_SOURCE_NAME="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_NAME}:5432/${DB_NAME}?sslmode=disable" \
+        --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# MongoDB monitoring configuration
+create_mongodb_monitoring() {
+    # Deploy mongodb-exporter
+    cat <<EOF | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${DB_NAME}-mongodb-exporter
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${DB_NAME}-mongodb-exporter
+  template:
+    metadata:
+      labels:
+        app: ${DB_NAME}-mongodb-exporter
+    spec:
+      containers:
+      - name: mongodb-exporter
+        image: percona/mongodb_exporter:0.34
+        ports:
+        - name: metrics
+          containerPort: 9216
+        env:
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: ${DB_NAME}-monitoring-secret
+              key: MONGODB_URI
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${DB_NAME}-mongodb-exporter
+  namespace: ${NAMESPACE}
+  labels:
+    app: ${DB_NAME}-mongodb-exporter
+spec:
+  ports:
+  - name: metrics
+    port: 9216
+    targetPort: metrics
+  selector:
+    app: ${DB_NAME}-mongodb-exporter
+EOF
+
+    # Create secret for mongodb-exporter
+    kubectl create secret generic ${DB_NAME}-monitoring-secret \
+        --namespace=${NAMESPACE} \
+        --from-literal=MONGODB_URI="mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_NAME}:27017/${DB_NAME}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# Create ServiceMonitor for Prometheus Operator
+create_service_monitor() {
+    local EXPORTER_NAME="${DB_NAME}-${DB_TYPE}-exporter"
+    local METRICS_PORT
+    
+    case ${DB_TYPE} in
+        "mysql")
+            METRICS_PORT=9104
+            ;;
+        "postgres")
+            METRICS_PORT=9187
+            ;;
+        "mongodb")
+            METRICS_PORT=9216
+            ;;
+    esac
+
+    cat <<EOF | kubectl apply -f -
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ${DB_NAME}-monitor
+  namespace: ${NAMESPACE}
+  labels:
+    release: prometheus
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    path: /metrics
+  namespaceSelector:
+    matchNames:
+    - ${NAMESPACE}
+  selector:
+    matchLabels:
+      app: ${EXPORTER_NAME}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ${DB_NAME}-rules
+  namespace: ${NAMESPACE}
+  labels:
+    release: prometheus
+spec:
+  groups:
+  - name: ${DB_NAME}.rules
+    rules:
+    - alert: ${DB_TYPE^}InstanceDown
+      expr: up{job="${EXPORTER_NAME}"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "${DB_TYPE^} instance is down"
+        description: "${DB_TYPE^} instance has been down for more than 5 minutes."
+    
+    # Database-specific alerts
+    - alert: ${DB_TYPE^}HighConnections
+      expr: |
+        ${DB_TYPE} == "mysql" && mysql_global_status_threads_connected > 80% * mysql_global_variables_max_connections ||
+        ${DB_TYPE} == "postgres" && pg_stat_activity_count > 80% * pg_settings_max_connections ||
+        ${DB_TYPE} == "mongodb" && mongodb_connections{state="current"} > 80% * mongodb_connections{state="available"}
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High number of database connections"
+        description: "More than 80% of available connections are in use."
+    
+    - alert: ${DB_TYPE^}HighCPUUsage
+      expr: rate(process_cpu_seconds_total{job="${EXPORTER_NAME}"}[5m]) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage"
+        description: "Database is using more than 80% CPU for 5 minutes."
+    
+    - alert: ${DB_TYPE^}HighMemoryUsage
+      expr: |
+        process_resident_memory_bytes{job="${EXPORTER_NAME}"} / container_memory_working_set_bytes{container="${DB_NAME}"} * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage"
+        description: "Database is using more than 80% of allocated memory."
+    
+    - alert: ${DB_TYPE^}SlowQueries
+      expr: |
+        ${DB_TYPE} == "mysql" && rate(mysql_global_status_slow_queries[5m]) > 0 ||
+        ${DB_TYPE} == "postgres" && rate(pg_stat_database_xact_commit{datname="${DB_NAME}"}[5m]) < 10 ||
+        ${DB_TYPE} == "mongodb" && rate(mongodb_op_latencies_latency_total[5m]) > 100
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Slow queries detected"
+        description: "Database is experiencing slow query performance."
+EOF
+}
+
 # Main deployment function
 main() {
-
     echo "Starting database deployment..."
 
     echo "Configuring database..."
@@ -408,6 +700,9 @@ main() {
     create_ingress
     echo "Ingress created."
 
+    echo "Setting up monitoring..."
+    create_monitoring_config
+    echo "Monitoring setup completed."
 
     echo "✅ Database deployment completed!"
     echo "Access Info:"
@@ -416,6 +711,26 @@ main() {
         echo "- External: ${DOMAIN_NAME}"
     fi
     echo "- NodePort: ${PORT}"
+    echo ""
+    echo "Monitoring Info:"
+    echo "- Metrics endpoint: http://${DB_NAME}-${DB_TYPE}-exporter.${NAMESPACE}.svc.cluster.local:${METRICS_PORT}/metrics"
+    echo "- ServiceMonitor: ${DB_NAME}-monitor"
+    echo "- Grafana Dashboard IDs:"
+    case ${DB_TYPE} in
+        "mysql")
+            echo "  * MySQL Overview: 7362"
+            echo "  * MySQL Performance: 6239"
+            ;;
+        "postgres")
+            echo "  * PostgreSQL Overview: 9628"
+            echo "  * PostgreSQL Performance: 9628"
+            ;;
+        "mongodb")
+            echo "  * MongoDB Overview: 2583"
+            echo "  * MongoDB Performance: 7353"
+            ;;
+    esac
 }
 
+# Execute main function
 main

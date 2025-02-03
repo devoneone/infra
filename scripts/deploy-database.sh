@@ -369,211 +369,7 @@ EOF
 
 # Function to create monitoring configurations
 create_monitoring_config() {
-    # Create configmap for exporters configuration
-    case ${DB_TYPE} in
-        "mysql")
-            create_mysql_monitoring
-            ;;
-        "postgres")
-            create_postgres_monitoring
-            ;;
-        "mongodb")
-            create_mongodb_monitoring
-            ;;
-    esac
-
     # Create ServiceMonitor
-    create_service_monitor
-}
-
-# MySQL monitoring configuration
-create_mysql_monitoring() {
-    cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${DB_NAME}-mysqld-exporter
-  namespace: ${NAMESPACE}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${DB_NAME}-mysqld-exporter
-  template:
-    metadata:
-      labels:
-        app: ${DB_NAME}-mysqld-exporter
-    spec:
-      containers:
-      - name: mysqld-exporter
-        image: prom/mysqld-exporter:v0.14.0
-        args:
-        - --collect.info_schema.tables
-        - --collect.info_schema.tablestats
-        - --collect.global_status
-        - --collect.global_variables
-        - --collect.slave_status
-        - --collect.info_schema.processlist
-        ports:
-        - name: metrics
-          containerPort: 9104
-        env:
-        - name: DATA_SOURCE_NAME
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-monitoring-secret
-              key: DATA_SOURCE_NAME
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${DB_NAME}-mysqld-exporter
-  namespace: ${NAMESPACE}
-  labels:
-    app: ${DB_NAME}-mysqld-exporter
-spec:
-  ports:
-  - name: metrics
-    port: 9104
-    targetPort: metrics
-  selector:
-    app: ${DB_NAME}-mysqld-exporter
-EOF
-
-    # Create secret for mysqld-exporter
-    kubectl create secret generic ${DB_NAME}-monitoring-secret \
-        --namespace=${NAMESPACE} \
-        --from-literal=DATA_SOURCE_NAME="${DB_USERNAME}:${DB_PASSWORD}@(${DB_NAME}:3306)/" \
-        --dry-run=client -o yaml | kubectl apply -f -
-}
-
-# PostgreSQL monitoring configuration
-create_postgres_monitoring() {
-    # Deploy postgres-exporter
-    cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${DB_NAME}-postgres-exporter
-  namespace: ${NAMESPACE}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${DB_NAME}-postgres-exporter
-  template:
-    metadata:
-      labels:
-        app: ${DB_NAME}-postgres-exporter
-    spec:
-      containers:
-      - name: postgres-exporter
-        image: prometheuscommunity/postgres-exporter:v0.11.1
-        ports:
-        - name: metrics
-          containerPort: 9187
-        env:
-        - name: DATA_SOURCE_NAME
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-monitoring-secret
-              key: DATA_SOURCE_NAME
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${DB_NAME}-postgres-exporter
-  namespace: ${NAMESPACE}
-  labels:
-    app: ${DB_NAME}-postgres-exporter
-spec:
-  ports:
-  - name: metrics
-    port: 9187
-    targetPort: metrics
-  selector:
-    app: ${DB_NAME}-postgres-exporter
-EOF
-
-    # Create secret for postgres-exporter
-    kubectl create secret generic ${DB_NAME}-monitoring-secret \
-        --namespace=${NAMESPACE} \
-        --from-literal=DATA_SOURCE_NAME="postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_NAME}:5432/${DB_NAME}?sslmode=disable" \
-        --dry-run=client -o yaml | kubectl apply -f -
-}
-
-# MongoDB monitoring configuration
-create_mongodb_monitoring() {
-    # Deploy mongodb-exporter
-    cat <<EOF | kubectl apply -f -
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${DB_NAME}-mongodb-exporter
-  namespace: ${NAMESPACE}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: ${DB_NAME}-mongodb-exporter
-  template:
-    metadata:
-      labels:
-        app: ${DB_NAME}-mongodb-exporter
-    spec:
-      containers:
-      - name: mongodb-exporter
-        image: percona/mongodb_exporter:0.34
-        ports:
-        - name: metrics
-          containerPort: 9216
-        env:
-        - name: MONGODB_URI
-          valueFrom:
-            secretKeyRef:
-              name: ${DB_NAME}-monitoring-secret
-              key: MONGODB_URI
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ${DB_NAME}-mongodb-exporter
-  namespace: ${NAMESPACE}
-  labels:
-    app: ${DB_NAME}-mongodb-exporter
-spec:
-  ports:
-  - name: metrics
-    port: 9216
-    targetPort: metrics
-  selector:
-    app: ${DB_NAME}-mongodb-exporter
-EOF
-
-    # Create secret for mongodb-exporter
-    kubectl create secret generic ${DB_NAME}-monitoring-secret \
-        --namespace=${NAMESPACE} \
-        --from-literal=MONGODB_URI="mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_NAME}:27017/${DB_NAME}" \
-        --dry-run=client -o yaml | kubectl apply -f -
-}
-
-# Create ServiceMonitor for Prometheus Operator
-create_service_monitor() {
-    local EXPORTER_NAME="${DB_NAME}-${DB_TYPE}-exporter"
-    local METRICS_PORT
-    
-    case ${DB_TYPE} in
-        "mysql")
-            METRICS_PORT=9104
-            ;;
-        "postgres")
-            METRICS_PORT=9187
-            ;;
-        "mongodb")
-            METRICS_PORT=9216
-            ;;
-    esac
-
     cat <<EOF | kubectl apply -f -
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -592,71 +388,299 @@ spec:
     - ${NAMESPACE}
   selector:
     matchLabels:
-      app: ${EXPORTER_NAME}
+      app: ${DB_NAME}-${DB_TYPE}-exporter
 ---
+# Storage Monitoring Rules and Alerts
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: ${DB_NAME}-rules
+  name: ${DB_NAME}-storage-rules
   namespace: ${NAMESPACE}
   labels:
     release: prometheus
 spec:
   groups:
-  - name: ${DB_NAME}.rules
+  - name: ${NAMESPACE}.storage.rules
     rules:
-    - alert: ${DB_TYPE^}InstanceDown
-      expr: up{job="${EXPORTER_NAME}"} == 0
+    # Storage Metrics
+    - record: db_storage_used_bytes
+      expr: |
+        kubelet_volume_stats_used_bytes{persistentvolumeclaim="${DB_NAME}-pvc",namespace="${NAMESPACE}"}
+    
+    - record: db_storage_available_bytes
+      expr: |
+        kubelet_volume_stats_available_bytes{persistentvolumeclaim="${DB_NAME}-pvc",namespace="${NAMESPACE}"}
+    
+    - record: db_storage_total_bytes
+      expr: |
+        kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="${DB_NAME}-pvc",namespace="${NAMESPACE}"}
+    
+    - record: db_storage_used_percentage
+      expr: |
+        (kubelet_volume_stats_used_bytes{persistentvolumeclaim="${DB_NAME}-pvc",namespace="${NAMESPACE}"} / 
+         kubelet_volume_stats_capacity_bytes{persistentvolumeclaim="${DB_NAME}-pvc",namespace="${NAMESPACE}"}) * 100
+
+    # Storage Alerts
+    - alert: StorageNearlyFull
+      expr: |
+        db_storage_used_percentage > 75
+      for: 5m
+      labels:
+        severity: warning
+        namespace: "${NAMESPACE}"
+        database: "${DB_NAME}"
+      annotations:
+        summary: "Storage Nearly Full in ${NAMESPACE}"
+        description: "Database storage is at {{ $value | printf \"%.2f\" }}% capacity"
+
+    - alert: StorageCritical
+      expr: |
+        db_storage_used_percentage > 85
       for: 5m
       labels:
         severity: critical
+        namespace: "${NAMESPACE}"
+        database: "${DB_NAME}"
       annotations:
-        summary: "${DB_TYPE^} instance is down"
-        description: "${DB_TYPE^} instance has been down for more than 5 minutes."
-    
-    # Database-specific alerts
-    - alert: ${DB_TYPE^}HighConnections
+        summary: "Storage Critical in ${NAMESPACE}"
+        description: "Database storage is at {{ $value | printf \"%.2f\" }}% capacity"
+
+    - alert: StorageEmergency
       expr: |
-        ${DB_TYPE} == "mysql" && mysql_global_status_threads_connected > 80% * mysql_global_variables_max_connections ||
-        ${DB_TYPE} == "postgres" && pg_stat_activity_count > 80% * pg_settings_max_connections ||
-        ${DB_TYPE} == "mongodb" && mongodb_connections{state="current"} > 80% * mongodb_connections{state="available"}
-      for: 5m
+        db_storage_used_percentage > 95
+      for: 2m
       labels:
-        severity: warning
+        severity: emergency
+        namespace: "${NAMESPACE}"
+        database: "${DB_NAME}"
       annotations:
-        summary: "High number of database connections"
-        description: "More than 80% of available connections are in use."
-    
-    - alert: ${DB_TYPE^}HighCPUUsage
-      expr: rate(process_cpu_seconds_total{job="${EXPORTER_NAME}"}[5m]) * 100 > 80
-      for: 5m
-      labels:
-        severity: warning
-      annotations:
-        summary: "High CPU usage"
-        description: "Database is using more than 80% CPU for 5 minutes."
-    
-    - alert: ${DB_TYPE^}HighMemoryUsage
+        summary: "Storage Emergency in ${NAMESPACE}"
+        description: "CRITICAL: Storage is at {{ $value | printf \"%.2f\" }}% capacity"
+
+    - alert: StorageGrowthRate
       expr: |
-        process_resident_memory_bytes{job="${EXPORTER_NAME}"} / container_memory_working_set_bytes{container="${DB_NAME}"} * 100 > 80
-      for: 5m
+        rate(db_storage_used_bytes[1h]) > 0
+      for: 15m
       labels:
-        severity: warning
+        severity: info
+        namespace: "${NAMESPACE}"
+        database: "${DB_NAME}"
       annotations:
-        summary: "High memory usage"
-        description: "Database is using more than 80% of allocated memory."
-    
-    - alert: ${DB_TYPE^}SlowQueries
-      expr: |
-        ${DB_TYPE} == "mysql" && rate(mysql_global_status_slow_queries[5m]) > 0 ||
-        ${DB_TYPE} == "postgres" && rate(pg_stat_database_xact_commit{datname="${DB_NAME}"}[5m]) < 10 ||
-        ${DB_TYPE} == "mongodb" && rate(mongodb_op_latencies_latency_total[5m]) > 100
-      for: 5m
-      labels:
-        severity: warning
-      annotations:
-        summary: "Slow queries detected"
-        description: "Database is experiencing slow query performance."
+        summary: "Storage Growth Detected in ${NAMESPACE}"
+        description: "Storage growing at {{ $value | humanize }}B per second"
+EOF
+
+    # Create Grafana Dashboard
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${DB_NAME}-storage-dashboard
+  namespace: ${NAMESPACE}
+  labels:
+    grafana_dashboard: "true"
+data:
+  storage-dashboard.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "editable": true,
+      "graphTooltip": 0,
+      "links": [],
+      "panels": [
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 75 },
+                  { "color": "orange", "value": 85 },
+                  { "color": "red", "value": 95 }
+                ]
+              },
+              "unit": "percent"
+            }
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "pluginVersion": "7.2.0",
+          "targets": [
+            {
+              "expr": "db_storage_used_percentage{namespace=\"${NAMESPACE}\"}",
+              "interval": "",
+              "legendFormat": "",
+              "refId": "A"
+            }
+          ],
+          "title": "Storage Usage",
+          "type": "gauge"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "unit": "bytes"
+            }
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            }
+          },
+          "pluginVersion": "7.2.0",
+          "targets": [
+            {
+              "expr": "db_storage_available_bytes{namespace=\"${NAMESPACE}\"}",
+              "interval": "",
+              "legendFormat": "Available",
+              "refId": "A"
+            },
+            {
+              "expr": "db_storage_used_bytes{namespace=\"${NAMESPACE}\"}",
+              "interval": "",
+              "legendFormat": "Used",
+              "refId": "B"
+            }
+          ],
+          "title": "Storage Breakdown",
+          "type": "stat"
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "unit": "bytes"
+            }
+          },
+          "fill": 1,
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 8
+          },
+          "id": 3,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "rate(db_storage_used_bytes{namespace=\"${NAMESPACE}\"}[1h])",
+              "interval": "",
+              "legendFormat": "Growth Rate",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Storage Growth Rate",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "bytes",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ]
+        }
+      ],
+      "refresh": "5s",
+      "schemaVersion": 26,
+      "style": "dark",
+      "tags": [],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "",
+      "title": "${DB_NAME} Storage Monitor - ${NAMESPACE}",
+      "uid": "${NAMESPACE}-storage",
+      "version": 1
+    }
 EOF
 }
 
@@ -712,24 +736,18 @@ main() {
     fi
     echo "- NodePort: ${PORT}"
     echo ""
-    echo "Monitoring Info:"
-    echo "- Metrics endpoint: http://${DB_NAME}-${DB_TYPE}-exporter.${NAMESPACE}.svc.cluster.local:${METRICS_PORT}/metrics"
-    echo "- ServiceMonitor: ${DB_NAME}-monitor"
-    echo "- Grafana Dashboard IDs:"
-    case ${DB_TYPE} in
-        "mysql")
-            echo "  * MySQL Overview: 7362"
-            echo "  * MySQL Performance: 6239"
-            ;;
-        "postgres")
-            echo "  * PostgreSQL Overview: 9628"
-            echo "  * PostgreSQL Performance: 9628"
-            ;;
-        "mongodb")
-            echo "  * MongoDB Overview: 2583"
-            echo "  * MongoDB Performance: 7353"
-            ;;
-    esac
+    echo "Storage Monitoring Info:"
+    echo "- Storage Metrics available in Prometheus"
+    echo "- View the Grafana dashboard: ${DB_NAME} Storage Monitor - ${NAMESPACE}"
+    echo "- Alert thresholds:"
+    echo "  * Warning: 75% usage"
+    echo "  * Critical: 85% usage"
+    echo "  * Emergency: 95% usage"
+    echo ""
+    echo "PromQL Queries for Storage:"
+    echo "- Used Storage: db_storage_used_bytes{namespace=\"${NAMESPACE}\"}"
+    echo "- Available Storage: db_storage_available_bytes{namespace=\"${NAMESPACE}\"}"
+    echo "- Usage Percentage: db_storage_used_percentage{namespace=\"${NAMESPACE}\"}"
 }
 
 # Execute main function

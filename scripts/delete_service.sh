@@ -10,13 +10,7 @@ fi
 
 NAMESPACE=$1
 
-# Confirmation prompt
-read -p "Are you sure you want to delete all services in namespace: $NAMESPACE? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-  echo "Operation cancelled."
-  exit 1
-fi
+
 
 # DELETE ALL SERVICES
 echo "Deleting all services in namespace: $NAMESPACE..."

@@ -7,9 +7,9 @@
     - name: Copy shell script to Kubernetes server
       copy:
         src: ../scripts/delete_service.sh
-        dest: /home/root/cloudinator/delete_service.sh
+        dest: /home/asura/cloudinator/delete_service.sh
         mode: '0755'
 
     - name: Execute the shell script to scale deployments and delete all services
       command: >
-        bash /home/root/cloudinator/delete_service.sh {{ NAMESPACE }}
+        bash /home/asura/cloudinator/delete_service.sh {{ NAMESPACE }}

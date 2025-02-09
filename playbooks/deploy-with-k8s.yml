@@ -14,13 +14,13 @@
     - name: Copy shell script to Kubernetes server
       copy:
         src: ../scripts/deploy-k8s.sh
-        dest: /home/root/cloudinator/deploy-k8s.sh
+        dest: /home/asura/cloudinator/deploy-k8s.sh
         mode: '0755'
 
     - name: Execute the shell script with dynamic variables
-      become_user: root
+      become_user: asura
       command: >
-        bash /home/root/cloudinator/deploy-k8s.sh 
+        bash /home/asura/cloudinator/deploy-k8s.sh 
         {{ APP_NAME }} 
         {{ IMAGE }} 
         {{ NAMESPACE }} 

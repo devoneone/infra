@@ -6,22 +6,22 @@
     - name: Copy the sync Helm to Git script
       copy:
         src: ../scripts/sync-helm-to-git.sh
-        dest: /home/asura/cloudinator/sync-helm-to-git.sh
+        dest: /home/root/cloudinator/sync-helm-to-git.sh
         mode: '0755'
-        owner: asura
-        group: asura
+        owner: root
+        group: root
 
     - name: Ensure the target directory is writable
       file:
-        path: /home/asura/cloudinator
+        path: /home/root/cloudinator
         mode: '0755'
-        owner: asura
-        group: asura
+        owner: root
+        group: root
         state: directory
 
     - name: Sync Helm chart to Git
-      become_user: asura
-      command: bash /home/asura/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }}
+      become_user: root
+      command: bash /home/root/cloudinator/sync-helm-to-git.sh {{ CHART_NAME }} {{ CHART_VERSION }}
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin"
       register: sync_result

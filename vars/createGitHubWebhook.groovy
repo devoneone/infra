@@ -29,27 +29,31 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     // Convert payload to JSON
     def payloadJson = groovy.json.JsonOutput.toJson(webhookPayload)
 
-    // Execute webhook creation
+    // Execute webhook creation with verbose error checking
     def response = sh(
         script: """
-            curl -s -X POST \
-                -H "Authorization: Bearer ${githubToken}" \
+            response=$(curl -s -w "\\nHTTP_STATUS:%{http_code}" \
+                -X POST \
+                -H "Authorization: token ${githubToken}" \
+                -H "Accept: application/vnd.github.v3+json" \
                 -H "Content-Type: application/json" \
                 -d '${payloadJson}' \
-                "${apiUrl}"
+                "${apiUrl}")
+            
+            body=$(echo "$response" | sed -e '$d')
+            http_status=$(echo "$response" | tail -n1 | sed -e 's/HTTP_STATUS://')
+            
+            echo "Response Body: $body"
+            echo "HTTP Status: $http_status"
+            
+            if [ "$http_status" -ne 201 ]; then
+                exit 1
+            fi
         """,
         returnStdout: true
     ).trim()
 
-    // Parse and validate response
-    def jsonResponse = parseJsonSafely(response)
-    
-    if (jsonResponse.containsKey('id')) {
-        echo "Webhook created successfully for ${repoUrl}"
-    } else {
-        def errorMessage = jsonResponse.message ?: "Unknown error occurred"
-        error "Failed to create webhook: ${errorMessage} - Full response: ${response}"
-    }
+    echo "Webhook creation response: ${response}"
 }
 
 // Helper method to extract owner and repo from repository URL
@@ -67,13 +71,4 @@ def generateWebhookSecret() {
         script: "openssl rand -hex 20",
         returnStdout: true
     ).trim()
-}
-
-// Helper method to safely parse JSON
-def parseJsonSafely(String jsonString) {
-    try {
-        return new groovy.json.JsonSlurperClassic().parseText(jsonString)
-    } catch (Exception e) {
-        error "Failed to parse JSON response: ${jsonString}"
-    }
 }

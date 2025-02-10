@@ -1,88 +1,72 @@
-#!/usr/bin/env groovy
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import hudson.util.Secret
 
-def call(Map config = [:]) {
-    // Extract owner and repo using string manipulation
-    String repoUrl = config.repoUrl ?: env.GIT_REPO_URL
-    String githubToken = config.githubToken ?: env.GITHUB_TOKEN
-    String webhookUrl = config.webhookUrl ?: env.WEBHOOK_URL
-    
-    List parts = repoUrl.replaceAll('\\.git$', '').split('/|:')
-    String owner = parts[-2]
-    String repo = parts[-1]
-    
-    // Validate GitHub Token
-    validateGitHubToken(githubToken)
-    
-    // Generate webhook secret
-    String webhookSecret = sh(
-        script: 'openssl rand -hex 20',
-        returnStdout: true
-    ).trim()
-    
-    // Create webhook
-    createWebhook(owner, repo, webhookSecret, githubToken, webhookUrl)
-}
+def call(String repoUrl, String webhookUrl, String githubToken) {
 
-private void validateGitHubToken(String token) {
-    def response = sh(
-        script: """
-            curl -s -w "%{http_code}" \\
-                -H "Authorization: Bearer ${token}" \\
-                -H "Accept: application/vnd.github.v3+json" \\
-                https://api.github.com/user
-        """,
-        returnStdout: true
-    ).trim()
-    def statusCode = response[-3..-1]
-    
-    if (statusCode != '200') {
-        error """
-        GitHub Token Validation Failed
-        Status Code: ${statusCode}
-        
-        Possible reasons:
-        - Token expired
-        - Insufficient permissions
-        - Network issues
-        """
+    if (!githubToken) {
+        echo "GitHub token is null, skipping webhook creation."
+        return
     }
-}
 
-private void createWebhook(String owner, String repo, String webhookSecret, String token, String webhookUrl) {
-    def webhookPayload = new groovy.json.JsonOutput().toJson([
-        name: "web",
-        active: true,
-        events: ["push"],
-        config: [
-            url: webhookUrl,
-            content_type: "json",
-            insecure_ssl: "0",
-            secret: webhookSecret
+    def WEBHOOK_SECRET = '1102b43d4bae5e52ede6fc05ee5dc20e91'
+    def repoParts = repoUrl.tokenize('/')
+    def owner = repoParts[-2]
+    def repo = repoParts[-1].replace('.git', '')
+
+    def apiUrl = "https://api.github.com/repos/${owner}/${repo}/hooks"
+
+    echo "Creating webhook for ${repo} repository..."
+    echo "API URL: ${apiUrl}"
+    echo "Webhook URL: ${webhookUrl}"
+    echo "GitHub Token: ${githubToken}"
+    echo "Webhook Secret: ${WEBHOOK_SECRET}"
+    echo "Owner: ${owner}"
+    echo "Repo: ${repo}"
+
+    // Fetch existing webhooks
+    def existingWebhooksResponse = httpRequest(
+        url: apiUrl,
+        httpMode: 'GET',
+        customHeaders: [[name: 'Authorization', value: "Bearer ${githubToken}"]],
+        contentType: 'APPLICATION_JSON'
+    )
+
+    def existingWebhooks = new JsonSlurper().parseText(existingWebhooksResponse.content)
+    def webhookExists = existingWebhooks.find { it.config.url == webhookUrl }
+
+    if (webhookExists) {
+        echo "Webhook already exists: ${webhookExists.url}"
+        return
+    }
+
+    // Prepare the webhook configuration payload
+    def webhookPayload = JsonOutput.toJson([
+        "name"       : "web",
+        "active"     : true,
+        "events"     : ["push"],
+        "config"     : [
+            "url"          : webhookUrl,
+            "content_type" : "json",
+            "insecure_ssl" : "0",
+            "secret"       : WEBHOOK_SECRET
         ]
     ])
-    
-    def response = sh(
-        script: """
-            curl -s -w "%{http_code}" \\
-                -X POST \\
-                -H "Authorization: Bearer ${token}" \\
-                -H "Content-Type: application/json" \\
-                -d '${webhookPayload}' \\
-                https://api.github.com/repos/${owner}/${repo}/hooks
-        """,
-        returnStdout: true
-    ).trim()
-    def statusCode = response[-3..-1]
-    
-    if (statusCode != '201') {
-        error """
-        Webhook Creation Failed
-        Status Code: ${statusCode}
-        
-        Possible reasons:
-        - Insufficient repository permissions
-        - Webhook already exists
-        - GitHub API restrictions
-        """
+
+    // Make the request to GitHub's API to create the webhook
+    def response = httpRequest(
+        url: apiUrl,
+        httpMode: 'POST',
+        customHeaders: [[name: 'Authorization', value: "Bearer ${githubToken}"]],
+        contentType: 'APPLICATION_JSON',
+        requestBody: webhookPayload
+    )
+
+    // Check if the webhook was created successfully
+    def jsonResponse = new JsonSlurper().parseText(response.content)
+    if (response.status == 201) {
+        echo "Webhook created successfully: ${jsonResponse.url}"
+    } else {
+        error "Failed to create webhook: ${jsonResponse.message}"
     }
 }

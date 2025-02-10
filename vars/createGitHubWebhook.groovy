@@ -33,7 +33,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     def response = sh(
         script: """
             curl -s -X POST \
-                -H "Authorization: token ${githubToken}" \
+                -H "Authorization: Bearer ${githubToken}" \
                 -H "Content-Type: application/json" \
                 -d '${payloadJson}' \
                 "${apiUrl}"
@@ -48,7 +48,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         echo "Webhook created successfully for ${repoUrl}"
     } else {
         def errorMessage = jsonResponse.message ?: "Unknown error occurred"
-        error "Failed to create webhook: ${errorMessage}"
+        error "Failed to create webhook: ${errorMessage} - Full response: ${response}"
     }
 }
 

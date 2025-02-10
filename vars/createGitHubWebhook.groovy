@@ -12,9 +12,9 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
 
     try {
         // Validate token first with verbose output
-        def tokenValidationScript = """
+        def tokenValidationScript = '''
             response=$(curl -v -s -w "%{http_code}" \
-                -H "Authorization: Bearer ${githubToken}" \
+                -H "Authorization: Bearer ''' + githubToken + '''" \
                 -H "Accept: application/vnd.github.v3+json" \
                 https://api.github.com/user)
             
@@ -27,7 +27,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
             if [ "$http_code" -ne 200 ]; then
                 exit 1
             fi
-        """
+        '''
 
         def tokenValidationResult = sh(
             script: tokenValidationScript,
@@ -63,13 +63,13 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         def payloadJson = groovy.json.JsonOutput.toJson(webhookPayload)
 
         // Execute webhook creation with verbose output
-        def webhookCreationScript = """
+        def webhookCreationScript = '''
             response=$(curl -v -s -w "%{http_code}" \
-                -H "Authorization: Bearer ${githubToken}" \
+                -H "Authorization: Bearer ''' + githubToken + '''" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/vnd.github.v3+json" \
-                -d '${payloadJson}' \
-                "${apiUrl}")
+                -d '''' + payloadJson + '''` \
+                "''' + apiUrl + '''")
             
             http_code=$(echo "$response" | tail -n1)
             body=$(echo "$response" | sed '$d')
@@ -80,7 +80,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
             if [ "$http_code" -ne 201 ]; then
                 exit 1
             fi
-        """
+        '''
 
         def webhookCreationResult = sh(
             script: webhookCreationScript,

@@ -29,7 +29,10 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     // Check existing webhooks
     def existingWebhooksResponse = sh(
         script: """
-            curl -s -H "Authorization: token ${githubToken}" "${apiUrl}"
+            curl -s \
+                -H 'Accept: application/vnd.github.v3+json' \
+                -H 'Authorization: Bearer ${githubToken}' \
+                "${apiUrl}"
         """,
         returnStdout: true
     ).trim()
@@ -40,6 +43,12 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     def existingWebhooks
     try {
         existingWebhooks = new JsonSlurperClassic().parseText(existingWebhooksResponse)
+        
+        // Check for API error response
+        if (existingWebhooks.message) {
+            error "GitHub API error: ${existingWebhooks.message}"
+            return
+        }
     } catch (Exception e) {
         error "Failed to parse existing webhooks response: ${e.message}"
     }
@@ -72,10 +81,12 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     // Create webhook
     def response = sh(
         script: """
-            curl -s -X POST -H "Authorization: token ${githubToken}" \
-                 -H "Content-Type: application/json" \
-                 -d '${webhookPayload}' \
-                 "${apiUrl}"
+            curl -s -X POST \
+                -H 'Accept: application/vnd.github.v3+json' \
+                -H 'Authorization: Bearer ${githubToken}' \
+                -H 'Content-Type: application/json' \
+                -d '${webhookPayload}' \
+                "${apiUrl}"
         """,
         returnStdout: true
     ).trim()
@@ -86,6 +97,12 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     def jsonResponse
     try {
         jsonResponse = new JsonSlurperClassic().parseText(response)
+        
+        // Check for API error response
+        if (jsonResponse.message) {
+            error "GitHub API error: ${jsonResponse.message}"
+            return
+        }
     } catch (Exception e) {
         error "Failed to parse webhook creation response: ${e.message}"
     }

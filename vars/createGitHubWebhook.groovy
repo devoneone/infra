@@ -1,26 +1,32 @@
+#!/usr/bin/env groovy
+
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurperClassic
 
 def call(String repoUrl, String webhookUrl, String githubToken) {
+    // Input validation
     if (!githubToken) {
         echo "GitHub token is null, skipping webhook creation."
         return
     }
 
+    // Constants
     def WEBHOOK_SECRET = '115c6b3844198294586262c6404939d29e'
+    
+    // Parse repository URL
     def repoParts = repoUrl.tokenize('/')
     def owner = repoParts[-2]
     def repo = repoParts[-1].replace('.git', '')
-
     def apiUrl = "https://api.github.com/repos/${owner}/${repo}/hooks"
 
+    // Log operation details
     echo "Creating webhook for ${repo} repository..."
     echo "API URL: ${apiUrl}"
     echo "Webhook URL: ${webhookUrl}"
     echo "Owner: ${owner}"
     echo "Repo: ${repo}"
 
-    // Fetch existing webhooks
+    // Check existing webhooks
     def existingWebhooksResponse = sh(
         script: """
             curl -s -H "Authorization: token ${githubToken}" "${apiUrl}"
@@ -30,6 +36,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
 
     echo "Existing webhooks response: ${existingWebhooksResponse}"
 
+    // Parse response
     def existingWebhooks
     try {
         existingWebhooks = new JsonSlurperClassic().parseText(existingWebhooksResponse)
@@ -37,31 +44,32 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         error "Failed to parse existing webhooks response: ${e.message}"
     }
 
+    // Validate response format
     if (!(existingWebhooks instanceof List)) {
         error "Unexpected response format for existing webhooks: ${existingWebhooksResponse}"
     }
 
+    // Check if webhook already exists
     def webhookExists = existingWebhooks.find { it?.config?.url == webhookUrl }
-
     if (webhookExists) {
         echo "Webhook already exists: ${webhookExists.url}"
         return
     }
 
-    // Prepare the webhook configuration payload
+    // Prepare webhook payload
     def webhookPayload = JsonOutput.toJson([
-        "name"   : "web",
-        "active" : true,
-        "events" : ["push"],
-        "config" : [
-            "url"          : webhookUrl,
-            "content_type" : "json",
-            "insecure_ssl" : "0",
-            "secret"       : WEBHOOK_SECRET
+        "name": "web",
+        "active": true,
+        "events": ["push"],
+        "config": [
+            "url": webhookUrl,
+            "content_type": "json",
+            "insecure_ssl": "0",
+            "secret": WEBHOOK_SECRET
         ]
     ])
 
-    // Make the request to GitHub's API to create the webhook
+    // Create webhook
     def response = sh(
         script: """
             curl -s -X POST -H "Authorization: token ${githubToken}" \
@@ -74,6 +82,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
 
     echo "Create webhook response: ${response}"
 
+    // Parse and validate response
     def jsonResponse
     try {
         jsonResponse = new JsonSlurperClassic().parseText(response)
@@ -86,5 +95,4 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     } else {
         error "Failed to create webhook: ${jsonResponse?.message ?: 'Unknown error'}"
     }
-    
 }

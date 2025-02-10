@@ -68,7 +68,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
                 -H "Authorization: Bearer ''' + githubToken + '''" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/vnd.github.v3+json" \
-                -d '''' + payloadJson + '''` \
+                -d '''' + payloadJson.replace("'", "\\'") + '''" \
                 "''' + apiUrl + '''")
             
             http_code=$(echo "$response" | tail -n1)

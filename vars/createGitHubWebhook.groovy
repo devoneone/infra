@@ -7,7 +7,7 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         return
     }
 
-    def WEBHOOK_SECRET = '11ae9fb2b7cd313319024803e5ca3541f2'
+    def WEBHOOK_SECRET = '115c6b3844198294586262c6404939d29e'
     def repoParts = repoUrl.tokenize('/')
     def owner = repoParts[-2]
     def repo = repoParts[-1].replace('.git', '')

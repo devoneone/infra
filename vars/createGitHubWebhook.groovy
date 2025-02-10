@@ -11,11 +11,32 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
     }
 
     try {
-        // Validate token first
-        def tokenValidation = validateToken(githubToken)
-        
-        if (!tokenValidation.valid) {
-            error "❌ TOKEN VALIDATION FAILED: ${tokenValidation.message}"
+        // Validate token first with verbose output
+        def tokenValidationScript = """
+            response=$(curl -v -s -w "%{http_code}" \
+                -H "Authorization: Bearer ${githubToken}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/user)
+            
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | sed '$d')
+            
+            echo "HTTP Status Code: $http_code"
+            echo "Response Body: $body"
+            
+            if [ "$http_code" -ne 200 ]; then
+                exit 1
+            fi
+        """
+
+        def tokenValidationResult = sh(
+            script: tokenValidationScript,
+            returnStatus: true,
+            label: "Token Validation"
+        )
+
+        if (tokenValidationResult != 0) {
+            error "❌ TOKEN VALIDATION FAILED: Unable to authenticate with GitHub"
         }
 
         // Extract repository details
@@ -41,57 +62,47 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
         // Convert payload to JSON
         def payloadJson = groovy.json.JsonOutput.toJson(webhookPayload)
 
-        // Execute webhook creation
-        def response = sh(
-            script: """
-                curl -v -f -X POST \
-                    -H "Authorization: Bearer ${githubToken}" \
-                    -H "Content-Type: application/json" \
-                    -H "Accept: application/vnd.github.v3+json" \
-                    -d '${payloadJson}' \
-                    "${apiUrl}"
-            """,
-            returnStdout: true
-        ).trim()
+        // Execute webhook creation with verbose output
+        def webhookCreationScript = """
+            response=$(curl -v -s -w "%{http_code}" \
+                -H "Authorization: Bearer ${githubToken}" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -d '${payloadJson}' \
+                "${apiUrl}")
+            
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | sed '$d')
+            
+            echo "Webhook Creation HTTP Status Code: $http_code"
+            echo "Webhook Creation Response Body: $body"
+            
+            if [ "$http_code" -ne 201 ]; then
+                exit 1
+            fi
+        """
+
+        def webhookCreationResult = sh(
+            script: webhookCreationScript,
+            returnStatus: true,
+            label: "Webhook Creation"
+        )
+
+        if (webhookCreationResult != 0) {
+            error "❌ WEBHOOK CREATION FAILED: Unable to create webhook"
+        }
 
         println "✅ Webhook created successfully"
         return true
 
     } catch (Exception e) {
-        println "❌ WEBHOOK CREATION FAILED"
-        println "Error Details: ${e.message}"
-        error "Webhook creation process encountered a critical error: ${e.message}"
+        println "❌ CRITICAL ERROR DURING WEBHOOK PROCESS"
+        println "Detailed Error: ${e.message}"
+        error "Webhook creation failed: ${e.message}"
     }
 }
 
-// Token validation method
-def validateToken(String githubToken) {
-    try {
-        def response = sh(
-            script: """
-                curl -s -f -H "Authorization: Bearer ${githubToken}" \
-                     -H "Accept: application/vnd.github.v3+json" \
-                     https://api.github.com/user
-            """,
-            returnStdout: true
-        ).trim()
-
-        def jsonResponse = new groovy.json.JsonSlurperClassic().parseText(response)
-        
-        if (jsonResponse.login) {
-            println "✅ Token is valid for GitHub user: ${jsonResponse.login}"
-            return [valid: true, message: "Token is valid", username: jsonResponse.login]
-        } else {
-            println "❌ Token validation failed"
-            return [valid: false, message: "Unable to validate token"]
-        }
-    } catch (Exception e) {
-        println "❌ Token validation error: ${e.message}"
-        return [valid: false, message: "Token validation error"]
-    }
-}
-
-// Extract repository details from URL
+// Existing helper methods remain the same
 def extractRepoDetails(String repoUrl) {
     def matcher = repoUrl =~ /.*[\/:]([^\/]+)\/([^\/]+)\.git/
     if (matcher.find()) {
@@ -102,7 +113,6 @@ def extractRepoDetails(String repoUrl) {
     error "Invalid repository URL format: ${repoUrl}"
 }
 
-// Generate secure webhook secret
 def generateWebhookSecret() {
     return sh(
         script: "openssl rand -hex 20",

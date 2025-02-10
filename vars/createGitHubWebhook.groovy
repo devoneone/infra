@@ -54,8 +54,8 @@ def call(String repoUrl, String webhookUrl, String githubToken) {
 
 // Helper method to extract owner and repo from repository URL
 def extractRepoDetails(String repoUrl) {
-    def matcher = repoUrl =~ /.*[:/]([^/]+)\/([^/]+)\.git/
-    if (matcher.matches()) {
+    def matcher = repoUrl =~ /.*[\/:]([^\/]+)\/([^\/]+)\.git/
+    if (matcher.find()) {
         return [matcher.group(1), matcher.group(2)]
     }
     error "Invalid repository URL format: ${repoUrl}"

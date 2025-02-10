@@ -1,0 +1,30 @@
+---
+- name: Setup GitHub Webhook
+  hosts: kube_servers
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Copy webhook setup script
+      copy:
+        src: ../scripts/setup_webhook.sh
+        dest: /home/asura/cloudinator/setup_webhook.sh
+        mode: '0755'
+
+    - name: Execute webhook setup script
+      command: >
+        bash /home/asura/cloudinator/setup_webhook.sh 
+        "{{ GIT_REPO_URL }}" 
+        "{{ WEBHOOK_URL }}" 
+        "{{ GITHUB_TOKEN }}"
+      register: webhook_result
+      failed_when: webhook_result.rc != 0
+
+    - name: Display webhook setup result
+      debug:
+        var: webhook_result.stdout_lines
+
+    - name: Clean up script
+      file:
+        path: /home/asura/cloudinator/setup_webhook.sh
+        state: absent
